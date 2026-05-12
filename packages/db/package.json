@@ -1,0 +1,25 @@
+{
+  "name": "@fcommerce/db",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate": "prisma db push --accept-data-loss",
+    "studio": "prisma studio",
+    "typecheck": "node scripts/typecheck.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.15.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.15.0",
+    "typescript": "^5.4.5",
+    "@types/node": "^20.14.0"
+  }
+}
