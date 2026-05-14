@@ -27,7 +27,15 @@
       "Bash(pnpm --filter @fcommerce/web typecheck)",
       "Bash(timeout 180 pnpm --filter @fcommerce/web build)",
       "Bash(claude mcp *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(pnpm --filter web exec tsc --noEmit -p tsconfig.json)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(npx next *)",
+      "Read(//c/c/Users/saika/Downloads/fcommerce-ops/apps/**)",
+      "Read(//c/c/Users/saika/Downloads/fcommerce-ops/apps/web/**)"
     ]
   }
 }

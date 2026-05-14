@@ -23,6 +23,7 @@ export type {
   Conversation,
   Message,
   AiHandoffFlag,
+  PlatformConfig,
   SubscriptionTier,
   SubscriptionStatus,
   CourierName,

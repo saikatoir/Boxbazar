@@ -10,6 +10,7 @@ import { webhookRoutes } from './webhooks.js';
 import { productRoutes } from './products.js';
 import { conversationRoutes } from './conversations.js';
 import { facebookRoutes } from './facebook.js';
+import { platformConfigRoutes } from './platform-config.js';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(healthRoutes);
@@ -23,4 +24,5 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await fastify.register(productRoutes, { prefix: '/api' });
   await fastify.register(conversationRoutes, { prefix: '/api' });
   await fastify.register(facebookRoutes, { prefix: '/api' });
+  await fastify.register(platformConfigRoutes, { prefix: '/api' });
 }

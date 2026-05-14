@@ -5,7 +5,7 @@ import {
   normalizeBDPhone,
 } from '@fcommerce/shared';
 import redis from './redis.js';
-import { env } from '../env.js';
+import { getPlatformConfig } from './platform-config.js';
 
 export type ParsedItem = {
   name: string;
@@ -169,8 +169,9 @@ type GeminiResponse = {
 };
 
 async function callGemini(text: string): Promise<GeminiResponse | null> {
-  if (!env.GEMINI_API_KEY) return null;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
+  const { geminiApiKey, geminiModel } = await getPlatformConfig();
+  if (!geminiApiKey) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
   const body = {
     contents: [
       {
@@ -292,13 +293,11 @@ export async function parseChat(text: string): Promise<ParseResult> {
   const heuristic = heuristicParse(trimmed);
   let llm: GeminiResponse | null = null;
   let source: ParseResult['source'] = 'heuristic';
-  if (env.GEMINI_API_KEY) {
-    try {
-      llm = await callGemini(trimmed);
-      source = 'gemini';
-    } catch (err) {
-      console.error('[chat-parser] Gemini call failed:', err);
-    }
+  try {
+    llm = await callGemini(trimmed);
+    if (llm) source = 'gemini';
+  } catch (err) {
+    console.error('[chat-parser] Gemini call failed:', err);
   }
 
   const merged = mergeParse(heuristic, llm);

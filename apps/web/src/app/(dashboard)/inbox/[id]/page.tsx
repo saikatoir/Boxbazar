@@ -9,14 +9,20 @@ import {
   Bot,
   BotOff,
   Send,
-  Loader2,
   AlertTriangle,
   CheckCheck,
   Package,
   Paperclip,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
-import { STATE_META, HANDOFF_LABELS, ORDER_STATUS_LABELS, type ConvState } from '@/lib/conv-meta';
+import {
+  STATE_META,
+  HANDOFF_LABELS,
+  ORDER_STATUS_LABELS,
+  type ConvState,
+} from '@/lib/conv-meta';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 
 type Source = 'customer' | 'ai' | 'seller';
 
@@ -64,7 +70,12 @@ interface ConversationDetail {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleString('bn-BD', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleString('bn-BD', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 export default function ConversationDetailPage() {
@@ -113,41 +124,48 @@ export default function ConversationDetailPage() {
     },
   });
 
-  if (isLoading) return <div className="p-8 text-gray-400">লোড হচ্ছে…</div>;
-  if (!convo) return <div className="p-8 text-gray-500">কথোপকথন পাওয়া যায়নি।</div>;
+  if (isLoading) return <div className="p-8 text-neutral-400 text-sm">লোড হচ্ছে…</div>;
+  if (!convo) return <div className="p-8 text-neutral-500 text-sm">কথোপকথন পাওয়া যায়নি।</div>;
 
   const unresolved = convo.handoffFlags.filter((f) => !f.resolved);
-  const stateMeta = STATE_META[convo.state] ?? { label: convo.state, cls: 'bg-gray-100 text-gray-600' };
+  const stateMeta = STATE_META[convo.state] ?? { label: convo.state, cls: 'bg-neutral-100 text-neutral-600' };
 
   return (
-    <div className="flex flex-col h-screen max-h-screen">
+    <div className="flex flex-col h-screen max-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-white px-4 md:px-6 py-3 flex items-center gap-3 flex-shrink-0">
-        <Link href="/inbox" className="text-gray-400 hover:text-gray-700">
+      <div className="border-b border-neutral-200 bg-white px-4 md:px-6 py-3 flex items-center gap-3 flex-shrink-0">
+        <Link
+          href="/inbox"
+          className="text-neutral-400 hover:text-neutral-700 p-1 -ml-1 rounded-md hover:bg-neutral-100"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Link>
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-neutral-600 ring-1 ring-neutral-200">
+          {convo.customer.name.slice(0, 1).toUpperCase()}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-gray-900 truncate">{convo.customer.name}</p>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full ${stateMeta.cls}`}>{stateMeta.label}</span>
+            <p className="font-semibold text-neutral-900 truncate">{convo.customer.name}</p>
+            <span className={cn('text-[11px] px-2 py-0.5 rounded-full', stateMeta.cls)}>
+              {stateMeta.label}
+            </span>
           </div>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-xs text-neutral-500 truncate mt-0.5">
             {convo.customer.phone ?? 'ফোন নম্বর নেই'} · {convo.channel}
           </p>
         </div>
-        <button
+        <Button
+          variant={convo.aiEnabled ? 'primary' : 'secondary'}
+          size="sm"
           onClick={() => toggleAi.mutate(!convo.aiEnabled)}
-          disabled={toggleAi.isPending}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            convo.aiEnabled
-              ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-          }`}
+          loading={toggleAi.isPending}
+          leftIcon={
+            convo.aiEnabled ? <Bot className="w-3.5 h-3.5" /> : <BotOff className="w-3.5 h-3.5" />
+          }
           title={convo.aiEnabled ? 'এই কথোপকথনে AI বন্ধ করুন' : 'এই কথোপকথনে AI চালু করুন'}
         >
-          {convo.aiEnabled ? <Bot className="w-4 h-4" /> : <BotOff className="w-4 h-4" />}
           {convo.aiEnabled ? 'AI চালু' : 'AI বন্ধ'}
-        </button>
+        </Button>
       </div>
 
       {/* Handoff banner */}
@@ -165,31 +183,38 @@ export default function ConversationDetailPage() {
               ))}
             </ul>
           </div>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => resolveHandoffs.mutate()}
-            disabled={resolveHandoffs.isPending}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-700 hover:bg-red-100 flex-shrink-0"
+            loading={resolveHandoffs.isPending}
+            className="bg-white border-red-200 text-red-700 hover:bg-red-100"
           >
             সব সমাধান হয়েছে
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Related orders */}
       {convo.orders.length > 0 && (
-        <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex gap-2 overflow-x-auto flex-shrink-0">
+        <div className="bg-white border-b border-neutral-100 px-4 md:px-6 py-3 flex gap-2 overflow-x-auto flex-shrink-0">
           {convo.orders.map((o) => {
-            const meta = ORDER_STATUS_LABELS[o.status] ?? { label: o.status, cls: 'bg-gray-100 text-gray-600' };
+            const meta =
+              ORDER_STATUS_LABELS[o.status] ?? { label: o.status, cls: 'bg-neutral-100 text-neutral-600' };
             const href = o.status === 'pending_approval' ? '/orders/pending' : `/orders/${o.id}`;
             return (
               <Link
                 key={o.id}
                 href={href}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-300 text-sm flex-shrink-0"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 text-sm flex-shrink-0 transition-colors"
               >
-                <Package className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-700">৳{Math.round(o.codCents / 100).toLocaleString('en-IN')}</span>
-                <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                <Package className="w-4 h-4 text-neutral-400" />
+                <span className="text-neutral-700 tabular-nums">
+                  ৳{Math.round(o.codCents / 100).toLocaleString('en-IN')}
+                </span>
+                <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full', meta.cls)}>
+                  {meta.label}
+                </span>
               </Link>
             );
           })}
@@ -197,9 +222,12 @@ export default function ConversationDetailPage() {
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto bg-gray-50 px-4 md:px-6 py-4 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto bg-neutral-50 px-4 md:px-6 py-5 space-y-3"
+      >
         {convo.messages.length === 0 && (
-          <p className="text-center text-sm text-gray-400 py-8">এখনও কোনো বার্তা নেই।</p>
+          <p className="text-center text-sm text-neutral-400 py-8">এখনও কোনো বার্তা নেই।</p>
         )}
         {convo.messages.map((m) => (
           <MessageBubble key={m.id} m={m} />
@@ -207,11 +235,12 @@ export default function ConversationDetailPage() {
       </div>
 
       {/* Reply box */}
-      <div className="border-t border-gray-200 bg-white px-4 md:px-6 py-3 flex-shrink-0">
+      <div className="border-t border-neutral-200 bg-white px-4 md:px-6 py-3 flex-shrink-0">
         {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
         {convo.aiEnabled && (
-          <p className="text-[11px] text-amber-600 mb-1.5">
-            AI চালু আছে — নিজে handle করতে চাইলে উপরে “AI বন্ধ” করুন।
+          <p className="text-[11px] text-amber-700 mb-1.5 flex items-center gap-1">
+            <Bot className="w-3 h-3" />
+            AI চালু আছে — নিজে handle করতে চাইলে উপরে "AI বন্ধ" করুন।
           </p>
         )}
         <form
@@ -234,16 +263,17 @@ export default function ConversationDetailPage() {
             }}
             rows={2}
             placeholder="গ্রাহককে বার্তা লিখুন…"
-            className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 resize-none rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 placeholder:text-neutral-400"
           />
-          <button
+          <Button
             type="submit"
-            disabled={!draft.trim() || sendMsg.isPending}
-            className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            size="lg"
+            disabled={!draft.trim()}
+            loading={sendMsg.isPending}
+            leftIcon={!sendMsg.isPending && <Send className="w-4 h-4" />}
           >
-            {sendMsg.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             পাঠান
-          </button>
+          </Button>
         </form>
       </div>
     </div>
@@ -254,16 +284,22 @@ function MessageBubble({ m }: { m: Message }) {
   const isInbound = m.direction === 'inbound';
   const align = isInbound ? 'items-start' : 'items-end';
   const bubble = isInbound
-    ? 'bg-white border border-gray-200 text-gray-800'
+    ? 'bg-white border border-neutral-200 text-neutral-800 shadow-sm'
     : m.source === 'ai'
-    ? 'bg-blue-600 text-white'
-    : 'bg-green-600 text-white';
+      ? 'bg-primary-600 text-white shadow-sm'
+      : 'bg-emerald-600 text-white shadow-sm';
   const sourceLabel = isInbound ? 'গ্রাহক' : m.source === 'ai' ? 'AI' : 'আপনি';
   const conf = m.aiConfidence ?? m.aiIntentClassification?.confidence;
 
   return (
-    <div className={`flex flex-col ${align}`}>
-      <div className={`max-w-[80%] md:max-w-[65%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words ${bubble}`}>
+    <div className={cn('flex flex-col', align)}>
+      <div
+        className={cn(
+          'max-w-[80%] md:max-w-[65%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words',
+          isInbound ? 'rounded-tl-md' : 'rounded-tr-md',
+          bubble,
+        )}
+      >
         {m.text || <span className="opacity-70 italic">[সংযুক্তি]</span>}
         {m.attachments?.length > 0 && (
           <div className="mt-1.5 space-y-1">
@@ -274,7 +310,10 @@ function MessageBubble({ m }: { m: Message }) {
                   href={a.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`flex items-center gap-1 text-xs underline ${isInbound ? 'text-blue-600' : 'text-white/90'}`}
+                  className={cn(
+                    'flex items-center gap-1 text-xs underline',
+                    isInbound ? 'text-primary-700' : 'text-white/90',
+                  )}
                 >
                   <Paperclip className="w-3 h-3" /> {a.type}
                 </a>
@@ -287,11 +326,11 @@ function MessageBubble({ m }: { m: Message }) {
           </div>
         )}
       </div>
-      <div className="flex items-center gap-1.5 mt-1 px-1 text-[10px] text-gray-400">
+      <div className="flex items-center gap-1.5 mt-1 px-1 text-[10px] text-neutral-400">
         <span>{sourceLabel}</span>
         {m.source === 'ai' && typeof conf === 'number' && <span>· {Math.round(conf * 100)}%</span>}
         <span>· {fmtTime(m.createdAt)}</span>
-        {!isInbound && m.metaMessageId && <CheckCheck className="w-3 h-3 text-gray-300" />}
+        {!isInbound && m.metaMessageId && <CheckCheck className="w-3 h-3 text-neutral-300" />}
       </div>
     </div>
   );

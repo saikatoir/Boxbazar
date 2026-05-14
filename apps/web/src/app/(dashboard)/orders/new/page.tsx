@@ -8,12 +8,15 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { readClipboardText } from '@/lib/clipboard';
+import { PageContainer } from '@/components/ui/PageHeader';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 type ParsedItem = {
   name: string;
@@ -57,23 +60,23 @@ type Stage = 'paste' | 'review' | 'saved';
 function ConfidenceChip({ score }: { score: number }) {
   if (score >= 0.75) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
-        <CheckCircle2 className="w-3.5 h-3.5" />
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full ring-1 ring-inset ring-emerald-200">
+        <CheckCircle2 className="w-3 h-3" />
         নির্ভরযোগ্য
       </span>
     );
   }
   if (score >= 0.4) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
-        <AlertCircle className="w-3.5 h-3.5" />
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full ring-1 ring-inset ring-amber-200">
+        <AlertCircle className="w-3 h-3" />
         একটু যাচাই করুন
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
-      <AlertCircle className="w-3.5 h-3.5" />
+    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-700 bg-red-50 px-1.5 py-0.5 rounded-full ring-1 ring-inset ring-red-200">
+      <AlertCircle className="w-3 h-3" />
       নিজে পূরণ করুন
     </span>
   );
@@ -204,10 +207,10 @@ export default function NewOrderPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto">
+    <PageContainer>
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-4"
       >
         <ArrowLeft className="w-4 h-4" />
         ড্যাশবোর্ডে ফিরুন
@@ -215,12 +218,12 @@ export default function NewOrderPage() {
 
       {stage === 'paste' && (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-[22px] font-semibold tracking-tight text-neutral-900 mb-1">
             চ্যাট থেকে অর্ডার তৈরি করুন
           </h1>
-          <p className="text-gray-500 mb-6">
-            Messenger বা WhatsApp চ্যাটের অংশটুকু paste করুন — আমরা automatically
-            customer-র নাম, ফোন, ঠিকানা, item এবং COD বের করে দেব।
+          <p className="text-sm text-neutral-500 mb-5">
+            Messenger বা WhatsApp চ্যাটের অংশটুকু paste করুন — নাম, ফোন, ঠিকানা, item ও COD
+            automatically বের হয়ে আসবে।
           </p>
 
           {errorMsg && (
@@ -229,56 +232,50 @@ export default function NewOrderPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6">
-            <div className="flex items-center justify-between mb-3">
-              <label
-                htmlFor="chat-text"
-                className="text-sm font-medium text-gray-700"
-              >
-                চ্যাটের অংশ
-              </label>
-              <button
-                onClick={handlePasteFromClipboard}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-800"
-              >
-                <ClipboardPaste className="w-4 h-4" />
-                Clipboard থেকে paste
-              </button>
-            </div>
-            <textarea
-              id="chat-text"
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              placeholder={`উদাহরণ:\nনাম: রহিমা আক্তার\n01712345678\nমিরপুর ১০, ঢাকা — বাড়ি ১২, রোড ৪\n১ x শাড়ি — ১২০০ টাকা\nডেলিভারি ৬০ টাকা\nমোট ১২৬০`}
-              className="w-full h-56 md:h-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
-            />
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-gray-400">
-                {rawText.length}/৫০০০ অক্ষর
-              </p>
-              <button
-                onClick={handleParse}
-                disabled={parseMutation.isPending || rawText.trim().length < 5}
-                className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {parseMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                পার্স করুন
-              </button>
-            </div>
-          </div>
+          <Card>
+            <CardBody>
+              <div className="flex items-center justify-between mb-3">
+                <label htmlFor="chat-text" className="text-sm font-medium text-neutral-700">
+                  চ্যাটের অংশ
+                </label>
+                <button
+                  onClick={handlePasteFromClipboard}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800"
+                >
+                  <ClipboardPaste className="w-4 h-4" />
+                  Clipboard থেকে paste
+                </button>
+              </div>
+              <textarea
+                id="chat-text"
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                placeholder={`উদাহরণ:\nনাম: রহিমা আক্তার\n01712345678\nমিরপুর ১০, ঢাকা — বাড়ি ১২, রোড ৪\n১ x শাড়ি — ১২০০ টাকা\nডেলিভারি ৬০ টাকা\nমোট ১২৬০`}
+                className="w-full h-56 md:h-64 rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 resize-y placeholder:text-neutral-400"
+              />
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-xs text-neutral-400 tabular-nums">{rawText.length}/৫০০০ অক্ষর</p>
+                <Button
+                  size="lg"
+                  onClick={handleParse}
+                  disabled={rawText.trim().length < 5}
+                  loading={parseMutation.isPending}
+                  leftIcon={!parseMutation.isPending && <Sparkles className="w-4 h-4" />}
+                >
+                  পার্স করুন
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
         </div>
       )}
 
       {stage === 'review' && parsed && confidence && (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-[22px] font-semibold tracking-tight text-neutral-900 mb-1">
             যাচাই করে save করুন
           </h1>
-          <p className="text-gray-500 mb-4">
+          <p className="text-sm text-neutral-500 mb-5">
             ভুল কিছু থাকলে এখনই ঠিক করুন। সব ফিল্ড edit-able।
           </p>
 
@@ -288,12 +285,10 @@ export default function NewOrderPage() {
             </div>
           )}
 
-          <div className="space-y-6">
-            <section className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6">
-              <h2 className="text-sm font-semibold text-gray-900 mb-4">
-                গ্রাহকের তথ্য
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-5">
+            <Card>
+              <CardHeader title="গ্রাহকের তথ্য" />
+              <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field
                   label="নাম"
                   score={confidence.fields.recipientName}
@@ -332,35 +327,27 @@ export default function NewOrderPage() {
                   onChange={(v) => updateField('area', v)}
                   fullWidth
                 />
-              </div>
-            </section>
+              </CardBody>
+            </Card>
 
-            <section className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  Item সমূহ
-                </h2>
-                <ConfidenceChip score={confidence.fields.items} />
-              </div>
-              <div className="space-y-3">
+            <Card>
+              <CardHeader
+                title="Item সমূহ"
+                action={<ConfidenceChip score={confidence.fields.items} />}
+              />
+              <CardBody className="space-y-3">
                 {parsed.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-12 gap-2 items-end"
-                  >
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-12 md:col-span-6">
-                      <label className="text-xs text-gray-500">নাম</label>
-                      <input
+                      <label className="text-xs font-medium text-neutral-700 mb-1 block">নাম</label>
+                      <Input
                         value={it.name}
-                        onChange={(e) =>
-                          updateItem(idx, { name: e.target.value })
-                        }
-                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        onChange={(e) => updateItem(idx, { name: e.target.value })}
                       />
                     </div>
                     <div className="col-span-4 md:col-span-2">
-                      <label className="text-xs text-gray-500">পরিমাণ</label>
-                      <input
+                      <label className="text-xs font-medium text-neutral-700 mb-1 block">পরিমাণ</label>
+                      <Input
                         type="number"
                         min={1}
                         value={it.quantity}
@@ -369,27 +356,23 @@ export default function NewOrderPage() {
                             quantity: Math.max(1, Number(e.target.value) || 1),
                           })
                         }
-                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                     <div className="col-span-6 md:col-span-3">
-                      <label className="text-xs text-gray-500">দাম (৳)</label>
-                      <input
+                      <label className="text-xs font-medium text-neutral-700 mb-1 block">দাম (৳)</label>
+                      <Input
                         type="number"
                         min={0}
                         value={toTaka(it.unitPriceCents)}
                         onChange={(e) =>
-                          updateItem(idx, {
-                            unitPriceCents: fromTaka(e.target.value),
-                          })
+                          updateItem(idx, { unitPriceCents: fromTaka(e.target.value) })
                         }
-                        className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
                     <div className="col-span-2 md:col-span-1">
                       <button
                         onClick={() => removeItem(idx)}
-                        className="w-full rounded-md border border-red-200 text-red-600 px-2 py-1.5 text-xs hover:bg-red-50"
+                        className="w-full h-9 rounded-lg border border-red-200 text-red-600 text-xs hover:bg-red-50 transition-colors"
                       >
                         মুছুন
                       </button>
@@ -398,21 +381,19 @@ export default function NewOrderPage() {
                 ))}
                 <button
                   onClick={addItem}
-                  className="text-sm text-blue-700 hover:text-blue-800 font-medium"
+                  className="text-sm text-primary-700 hover:text-primary-800 font-medium"
                 >
                   + আরেকটি item
                 </button>
-              </div>
-            </section>
+              </CardBody>
+            </Card>
 
-            <section className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-900">
-                  মূল্য (৳)
-                </h2>
-                <ConfidenceChip score={confidence.fields.codAmount} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader
+                title="মূল্য (৳)"
+                action={<ConfidenceChip score={confidence.fields.codAmount} />}
+              />
+              <CardBody className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <MoneyField
                   label="সাব-টোটাল"
                   value={parsed.subtotalCents}
@@ -428,51 +409,39 @@ export default function NewOrderPage() {
                   value={parsed.codCents}
                   onChange={(v) => updateField('codCents', v)}
                 />
-              </div>
-            </section>
+              </CardBody>
+            </Card>
 
             <div className="flex flex-col-reverse md:flex-row md:items-center md:justify-end gap-3">
-              <button
-                onClick={() => setStage('paste')}
-                className="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <Button variant="secondary" onClick={() => setStage('paste')}>
                 আবার paste করুন
-              </button>
-              <button
+              </Button>
+              <Button
+                size="lg"
                 onClick={handleSave}
-                disabled={saveMutation.isPending}
-                className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                loading={saveMutation.isPending}
+                leftIcon={!saveMutation.isPending && <CheckCircle2 className="w-4 h-4" />}
               >
-                {saveMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4" />
-                )}
                 Save করুন
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {stage === 'saved' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-          <div className="mx-auto w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 className="w-9 h-9 text-green-600" />
+        <Card className="p-10 text-center">
+          <div className="mx-auto w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mb-4 ring-4 ring-emerald-100/50">
+            <CheckCircle2 className="w-7 h-7 text-emerald-600" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">
-            অর্ডার save হয়েছে!
-          </h2>
-          <p className="text-gray-500 mb-2">
-            হাতে লিখে ৪–৫ মিনিট সময় বাঁচল। 🎉
-          </p>
+          <h2 className="text-lg font-semibold text-neutral-900 mb-1">অর্ডার save হয়েছে! 🎉</h2>
+          <p className="text-sm text-neutral-500 mb-2">হাতে লিখে ৪–৫ মিনিট সময় বাঁচল।</p>
           {savedAt && (
-            <p className="text-xs text-gray-400 mb-6">
-              {savedAt.toLocaleTimeString('bn-BD')}
-            </p>
+            <p className="text-xs text-neutral-400 mb-6">{savedAt.toLocaleTimeString('bn-BD')}</p>
           )}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
+            <Button
+              variant="secondary"
               onClick={() => {
                 setRawText('');
                 setParsed(null);
@@ -480,28 +449,21 @@ export default function NewOrderPage() {
                 setSavedOrderId(null);
                 setStage('paste');
               }}
-              className="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               আরেকটি অর্ডার
-            </button>
+            </Button>
             {savedOrderId && (
-              <button
-                onClick={() => router.push(`/orders/${savedOrderId}`)}
-                className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-              >
+              <Button onClick={() => router.push(`/orders/${savedOrderId}`)}>
                 কুরিয়ারে dispatch করুন
-              </button>
+              </Button>
             )}
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <Button variant="secondary" onClick={() => router.push('/dashboard')}>
               ড্যাশবোর্ডে
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -520,15 +482,11 @@ function Field({
 }) {
   return (
     <div className={fullWidth ? 'md:col-span-2' : ''}>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs text-gray-500">{label}</label>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-xs font-medium text-neutral-700">{label}</label>
         <ConfidenceChip score={score} />
       </div>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -544,8 +502,8 @@ function MoneyField({
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-500 mb-1 block">{label}</label>
-      <input
+      <label className="text-xs font-medium text-neutral-700 mb-1.5 block">{label}</label>
+      <Input
         type="number"
         min={0}
         value={value == null ? '' : toTaka(value)}
@@ -553,7 +511,6 @@ function MoneyField({
           if (e.target.value === '') onChange(null);
           else onChange(fromTaka(e.target.value));
         }}
-        className="w-full rounded-md border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
     </div>
   );

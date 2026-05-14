@@ -4,7 +4,7 @@ import { listManagedPages, MessengerClient, MetaAuthError } from '@fcommerce/met
 import { Prisma } from '@fcommerce/db';
 import { prisma } from '../lib/prisma.js';
 import { encryptPageToken } from '../lib/meta.js';
-import { env } from '../env.js';
+import { getPlatformConfig } from '../lib/platform-config.js';
 
 /** Minimum products required before the AI receptionist can be switched on. */
 const MIN_PRODUCTS_FOR_AI = 5;
@@ -58,7 +58,8 @@ export async function facebookRoutes(fastify: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const { userAccessToken } = z.object({ userAccessToken: z.string().min(10) }).parse(request.body);
       try {
-        const pages = await listManagedPages(userAccessToken, { graphVersion: env.META_GRAPH_VERSION });
+        const { metaGraphVersion } = await getPlatformConfig();
+        const pages = await listManagedPages(userAccessToken, { graphVersion: metaGraphVersion });
         return reply.send({
           pages: pages.map((p) => ({ id: p.id, name: p.name, category: p.category ?? null })),
         });
@@ -88,9 +89,10 @@ export async function facebookRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.status(409).send({ message: 'This Facebook page is already connected to another store.' });
       }
 
+      const { metaGraphVersion } = await getPlatformConfig();
       let page;
       try {
-        const pages = await listManagedPages(userAccessToken, { graphVersion: env.META_GRAPH_VERSION });
+        const pages = await listManagedPages(userAccessToken, { graphVersion: metaGraphVersion });
         page = pages.find((p) => p.id === pageId);
       } catch (err) {
         if (err instanceof MetaAuthError) return reply.status(401).send({ message: 'Invalid Facebook access token.' });
@@ -101,7 +103,7 @@ export async function facebookRoutes(fastify: FastifyInstance): Promise<void> {
 
       // Subscribe the app to the page's webhook events.
       try {
-        const client = new MessengerClient({ pageAccessToken: page.access_token, graphVersion: env.META_GRAPH_VERSION });
+        const client = new MessengerClient({ pageAccessToken: page.access_token, graphVersion: metaGraphVersion });
         const ok = await client.subscribeAppToPage();
         if (!ok) fastify.log.warn({ pageId }, 'subscribeAppToPage returned falsy');
       } catch (err) {

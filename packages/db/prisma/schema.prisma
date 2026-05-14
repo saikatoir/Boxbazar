@@ -485,3 +485,23 @@ model ChatParseAttempt {
 
   @@map("chat_parse_attempts")
 }
+
+// Single-row table holding platform-level API credentials editable from the
+// dashboard ("Platform API keys" page). The lone row is keyed by the literal
+// id 'singleton'. Sensitive values are stored in `encryptedSecrets` (AES-GCM
+// JSON blob) so they never appear in plain text; public/non-secret config
+// (App ID, Graph version, public webhook URL, model name) sits next to it.
+model PlatformConfig {
+  id               String   @id @default("singleton")
+  metaAppId        String?
+  metaGraphVersion String?
+  publicWebhookUrl String?
+  geminiModel      String?
+  aiProvider       String?
+  bulkSmsSenderId  String?
+  encryptedSecrets String?  @db.Text
+  updatedAt        DateTime @updatedAt @db.Timestamptz()
+  createdAt        DateTime @default(now()) @db.Timestamptz()
+
+  @@map("platform_config")
+}

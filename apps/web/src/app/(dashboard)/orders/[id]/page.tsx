@@ -9,7 +9,6 @@ import {
   Truck,
   Download,
   Share2,
-  Loader2,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
@@ -17,6 +16,11 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth';
 import { shareLink } from '@/lib/share';
+import { PageContainer } from '@/components/ui/PageHeader';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/lib/cn';
 
 type Courier = 'steadfast' | 'pathao' | 'redx';
 
@@ -87,9 +91,7 @@ export default function OrderDetailPage() {
   const accountsQuery = useQuery({
     queryKey: ['courier-accounts', order?.storeId],
     queryFn: () =>
-      apiClient.get<{ accounts: CourierAccount[] }>(
-        `/api/stores/${order!.storeId}/couriers`
-      ),
+      apiClient.get<{ accounts: CourierAccount[] }>(`/api/stores/${order!.storeId}/couriers`),
     enabled: !!order?.storeId,
   });
 
@@ -112,10 +114,10 @@ export default function OrderDetailPage() {
   });
 
   if (orderQuery.isLoading) {
-    return <div className="p-8 text-gray-400">লোড হচ্ছে…</div>;
+    return <div className="p-8 text-neutral-400 text-sm">লোড হচ্ছে…</div>;
   }
   if (!order) {
-    return <div className="p-8 text-gray-500">অর্ডার পাওয়া যায়নি।</div>;
+    return <div className="p-8 text-neutral-500 text-sm">অর্ডার পাওয়া যায়নি।</div>;
   }
 
   const latest = order.customer.addressHistory[0] ?? {};
@@ -130,52 +132,58 @@ export default function OrderDetailPage() {
   const codTaka = Math.round(order.codCents / 100);
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto">
+    <PageContainer>
       <Link
         href="/orders"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-6"
+        className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-900 mb-4"
       >
-        <ArrowLeft className="w-4 h-4" />
-        সব অর্ডার
+        <ArrowLeft className="w-4 h-4" /> সব অর্ডার
       </Link>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6 mb-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 truncate">
-              {order.customer.name}
-            </h1>
-            <p className="text-sm text-gray-500">{order.customer.phone}</p>
-            <p className="text-sm text-gray-700 mt-2">
-              {[latest.addressLine, latest.area, latest.zone, latest.city]
-                .filter(Boolean)
-                .join(', ')}
-            </p>
+      {/* Order summary */}
+      <Card className="mb-5">
+        <CardBody>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold text-neutral-900 truncate">
+                {order.customer.name}
+              </h1>
+              <p className="text-sm text-neutral-500 mt-0.5">{order.customer.phone}</p>
+              <p className="text-sm text-neutral-700 mt-2">
+                {[latest.addressLine, latest.area, latest.zone, latest.city]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">
+                COD
+              </p>
+              <p className="text-2xl font-semibold text-neutral-900 tabular-nums">
+                ৳ {codTaka.toLocaleString('en-IN')}
+              </p>
+            </div>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-xs text-gray-500">COD</p>
-            <p className="text-2xl font-bold text-gray-900">
-              ৳ {codTaka.toLocaleString('en-IN')}
-            </p>
-          </div>
-        </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Items</p>
-          <ul className="space-y-1 text-sm">
-            {order.items.map((it, idx) => (
-              <li key={idx} className="flex items-center justify-between">
-                <span className="text-gray-800">
-                  {it.quantity} × {it.name}
-                </span>
-                <span className="text-gray-500">
-                  ৳ {Math.round((it.unitPriceCents * it.quantity) / 100)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+          <div className="mt-4 pt-4 border-t border-neutral-100">
+            <p className="text-[11px] uppercase tracking-wider text-neutral-500 font-medium mb-2">
+              পণ্য
+            </p>
+            <ul className="space-y-1 text-sm">
+              {order.items.map((it, idx) => (
+                <li key={idx} className="flex items-center justify-between tabular-nums">
+                  <span className="text-neutral-800">
+                    <span className="text-neutral-400">{it.quantity} ×</span> {it.name}
+                  </span>
+                  <span className="text-neutral-500">
+                    ৳ {Math.round((it.unitPriceCents * it.quantity) / 100)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </CardBody>
+      </Card>
 
       {err && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -184,68 +192,65 @@ export default function OrderDetailPage() {
       )}
 
       {!isDispatched && (
-        <section className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">
-            কুরিয়ার নির্বাচন করুন
-          </h2>
-          <p className="text-xs text-gray-500 mb-4">
-            যে কুরিয়ার সবচেয়ে ভালো সেটি বেছে নিয়ে এক ক্লিকে dispatch করুন।
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {(Object.keys(COURIER_META) as Courier[]).map((c) => {
-              const meta = COURIER_META[c];
-              const acct = accountByCourier[c];
-              const ready = !!acct && acct.status === 'active';
-              const selected = chosenCourier === c;
-              return (
-                <button
-                  key={c}
-                  disabled={!ready}
-                  onClick={() => setChosenCourier(c)}
-                  className={`text-left rounded-xl border p-4 transition-colors ${
-                    !ready
-                      ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                      : selected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="font-semibold text-gray-900">{meta.label}</p>
-                    {ready ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-gray-400" />
+        <Card className="mb-5">
+          <CardHeader
+            title="কুরিয়ার নির্বাচন করুন"
+            description="যেটা সবচেয়ে ভালো বেছে নিন — এক ক্লিকে dispatch হবে।"
+          />
+          <CardBody>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(Object.keys(COURIER_META) as Courier[]).map((c) => {
+                const meta = COURIER_META[c];
+                const acct = accountByCourier[c];
+                const ready = !!acct && acct.status === 'active';
+                const selected = chosenCourier === c;
+                return (
+                  <button
+                    key={c}
+                    disabled={!ready}
+                    onClick={() => setChosenCourier(c)}
+                    className={cn(
+                      'text-left rounded-xl border p-4 transition-all',
+                      !ready && 'border-neutral-200 bg-neutral-50 text-neutral-400 cursor-not-allowed',
+                      ready && selected && 'border-primary-500 bg-primary-50/60 ring-1 ring-primary-200',
+                      ready && !selected && 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50',
                     )}
-                  </div>
-                  <p className="text-xs text-gray-500">{meta.tag}</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {ready
-                      ? acct?.lastBalanceAmount != null
-                        ? `Balance: ৳ ${Math.round(
-                            acct.lastBalanceAmount / 100
-                          ).toLocaleString('en-IN')}`
-                        : 'Connected'
-                      : 'Settings → add credentials'}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-semibold text-neutral-900">{meta.label}</p>
+                      {ready ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-neutral-400" />
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-500">{meta.tag}</p>
+                    <p className="text-xs text-neutral-400 mt-2">
+                      {ready
+                        ? acct?.lastBalanceAmount != null
+                          ? `ব্যালেন্স: ৳ ${Math.round(
+                              acct.lastBalanceAmount / 100,
+                            ).toLocaleString('en-IN')}`
+                          : 'Connected'
+                        : 'Settings → add credentials'}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
 
-          <button
-            onClick={() => chosenCourier && dispatch.mutate(chosenCourier)}
-            disabled={!chosenCourier || dispatch.isPending}
-            className="mt-5 inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {dispatch.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Truck className="w-4 h-4" />
-            )}
-            Book {chosenCourier ? COURIER_META[chosenCourier].label : ''}
-          </button>
-        </section>
+            <Button
+              className="mt-5"
+              size="lg"
+              onClick={() => chosenCourier && dispatch.mutate(chosenCourier)}
+              disabled={!chosenCourier}
+              loading={dispatch.isPending}
+              leftIcon={<Truck className="w-4 h-4" />}
+            >
+              Book {chosenCourier ? COURIER_META[chosenCourier].label : ''}
+            </Button>
+          </CardBody>
+        </Card>
       )}
 
       {isDispatched && order.consignment && (
@@ -256,7 +261,7 @@ export default function OrderDetailPage() {
           token={token}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -304,76 +309,79 @@ function DispatchedView({
   }
 
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <CheckCircle2 className="w-5 h-5 text-green-600" />
-        <h2 className="text-sm font-semibold text-gray-900">
-          {courierLabel}-এ dispatch হয়েছে
-        </h2>
-      </div>
+    <Card>
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            {courierLabel}-এ dispatch হয়েছে
+          </span>
+        }
+        action={<Badge tone="success" dot>{consignment.currentStatus}</Badge>}
+      />
+      <CardBody className="space-y-5">
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt className="text-[11px] uppercase tracking-wider text-neutral-500 font-medium">
+              Tracking
+            </dt>
+            <dd className="font-mono text-neutral-900 mt-0.5">{consignment.trackingCode}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] uppercase tracking-wider text-neutral-500 font-medium">
+              Invoice
+            </dt>
+            <dd className="font-mono text-neutral-900 mt-0.5">{consignment.invoiceId}</dd>
+          </div>
+        </dl>
 
-      <dl className="grid grid-cols-2 gap-3 text-sm mb-5">
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={handleDownload} leftIcon={<Download className="w-4 h-4" />}>
+            লেবেল ডাউনলোড
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleShare}
+            leftIcon={<Share2 className="w-4 h-4" />}
+          >
+            গ্রাহকের সাথে share
+          </Button>
+          <a
+            href={trackingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 border border-neutral-300 text-neutral-700 px-3.5 h-9 rounded-lg text-sm font-medium hover:bg-neutral-50"
+          >
+            <ExternalLink className="w-4 h-4" />
+            কুরিয়ার সাইটে
+          </a>
+        </div>
+
         <div>
-          <dt className="text-xs text-gray-500">Tracking</dt>
-          <dd className="font-mono text-gray-900">{consignment.trackingCode}</dd>
+          <h3 className="text-[11px] uppercase tracking-wider text-neutral-500 font-medium mb-2">
+            History
+          </h3>
+          {consignment.courierEvents.length === 0 ? (
+            <p className="text-sm text-neutral-400">এখনও কোনো ইভেন্ট আসেনি।</p>
+          ) : (
+            <ul className="space-y-2">
+              {consignment.courierEvents.map((ev) => (
+                <li
+                  key={ev.id}
+                  className="flex items-center justify-between text-sm py-1.5 border-b border-neutral-100 last:border-0"
+                >
+                  <span className="text-neutral-800">{ev.status}</span>
+                  <span className="text-xs text-neutral-400">
+                    {new Date(ev.occurredAt).toLocaleString('bn-BD')} ·{' '}
+                    {ev.source === 'webhook' ? 'live' : 'poll'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <div>
-          <dt className="text-xs text-gray-500">Invoice</dt>
-          <dd className="font-mono text-gray-900">{consignment.invoiceId}</dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-xs text-gray-500">বর্তমান স্ট্যাটাস</dt>
-          <dd className="text-gray-900">{consignment.currentStatus}</dd>
-        </div>
-      </dl>
-
-      <div className="flex flex-wrap gap-2 mb-5">
-        <button
-          onClick={handleDownload}
-          className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          <Download className="w-4 h-4" />
-          লেবেল ডাউনলোড
-        </button>
-        <button
-          onClick={handleShare}
-          className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
-        >
-          <Share2 className="w-4 h-4" />
-          গ্রাহকের সাথে share করুন
-        </button>
-        <a
-          href={trackingUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
-        >
-          <ExternalLink className="w-4 h-4" />
-          কুরিয়ার সাইটে
-        </a>
-      </div>
-
-      <div>
-        <h3 className="text-xs uppercase tracking-wide text-gray-500 mb-2">
-          History
-        </h3>
-        {consignment.courierEvents.length === 0 ? (
-          <p className="text-sm text-gray-400">এখনও কোনো ইভেন্ট আসেনি</p>
-        ) : (
-          <ul className="space-y-2">
-            {consignment.courierEvents.map((ev) => (
-              <li key={ev.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-800">{ev.status}</span>
-                <span className="text-xs text-gray-400">
-                  {new Date(ev.occurredAt).toLocaleString('bn-BD')} ·{' '}
-                  {ev.source === 'webhook' ? 'live' : 'poll'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
+      </CardBody>
+    </Card>
   );
 }
 

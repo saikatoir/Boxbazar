@@ -108,7 +108,7 @@ export async function conversationRoutes(fastify: FastifyInstance): Promise<void
 
       let metaMessageId: string | null = null;
       if (convo.channel === 'messenger' && convo.customer.messengerPsid) {
-        const client = messengerClientForStore(convo.store);
+        const client = await messengerClientForStore(convo.store);
         if (!client) return reply.status(409).send({ message: 'Store is not connected to a Facebook page.' });
         try {
           const sent = await client.sendText(convo.customer.messengerPsid, text);

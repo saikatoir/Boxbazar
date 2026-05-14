@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_Bengali } from 'next/font/google';
+import { Noto_Sans_Bengali, Inter } from 'next/font/google';
 import './globals.css';
 import { QueryProvider } from '@/providers/query-provider';
-import { Toaster } from '@/components/ui/toaster';
+import { ToastProvider } from '@/components/ui/Toast';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
 
 const notoSansBengali = Noto_Sans_Bengali({
   subsets: ['bengali'],
@@ -11,8 +17,9 @@ const notoSansBengali = Noto_Sans_Bengali({
 });
 
 export const metadata: Metadata = {
-  title: 'fCommerce Ops',
-  description: 'F-Commerce Operations Management Platform',
+  title: 'BoxBazar — AI Receptionist & F-commerce Ops',
+  description:
+    'Connect your Facebook page, let AI handle DMs, and ship orders end-to-end. Built for Bangladeshi sellers.',
 };
 
 export default function RootLayout({
@@ -21,11 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="bn" dir="auto" className={notoSansBengali.variable}>
+    <html
+      lang="bn"
+      dir="auto"
+      className={`${inter.variable} ${notoSansBengali.variable}`}
+    >
       <body>
         <QueryProvider>
-          {children}
-          <Toaster />
+          <ToastProvider>{children}</ToastProvider>
         </QueryProvider>
       </body>
     </html>

@@ -10,12 +10,12 @@ import {
 import { prisma } from '../lib/prisma.js';
 import { ingestStatusEvent } from '../lib/courier-status.js';
 import { enqueueMessengerEvent } from '../lib/messenger-queue.js';
-import { env } from '../env.js';
+import { getPlatformConfig } from '../lib/platform-config.js';
 
 function checkBearer(
   request: FastifyRequest,
   reply: FastifyReply,
-  expected: string | undefined
+  expected: string | null | undefined,
 ): boolean {
   if (!expected) {
     reply.status(503).send({ message: 'Webhook token not configured' });
@@ -57,12 +57,13 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Meta Messenger ──────────────────────────────────────────────────────
   // GET: webhook verification handshake (hub.mode / hub.verify_token / hub.challenge).
   fastify.get('/webhooks/messenger', async (request, reply) => {
-    if (!env.META_VERIFY_TOKEN) {
+    const { metaVerifyToken } = await getPlatformConfig();
+    if (!metaVerifyToken) {
       return reply.status(503).send({ message: 'Messenger webhook not configured' });
     }
     const challenge = verifyWebhookSubscription(
       request.query as Record<string, unknown>,
-      env.META_VERIFY_TOKEN,
+      metaVerifyToken,
     );
     if (challenge === null) return reply.status(403).send('Forbidden');
     return reply.status(200).type('text/plain').send(challenge);
@@ -73,13 +74,14 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
     '/webhooks/messenger',
     { config: { rateLimit: { max: 2000, timeWindow: '1 minute' } } },
     async (request, reply) => {
-      if (!env.META_APP_SECRET) {
+      const { metaAppSecret } = await getPlatformConfig();
+      if (!metaAppSecret) {
         return reply.status(503).send({ message: 'Messenger webhook not configured' });
       }
       const raw = request.rawBody;
       const sigHeader = request.headers['x-hub-signature-256'];
       const sig = Array.isArray(sigHeader) ? sigHeader[0] : sigHeader;
-      if (!raw || !verifySignature(raw, sig, env.META_APP_SECRET)) {
+      if (!raw || !verifySignature(raw, sig, metaAppSecret)) {
         return reply.status(401).send({ message: 'Invalid signature' });
       }
       const body = request.body as MessengerWebhookBody | undefined;
@@ -100,7 +102,8 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Steadfast ───────────────────────────────────────────────────────────
   // Steadfast pushes: { notification_type: 'delivery_status', consignment_id, ... }
   fastify.post('/webhooks/steadfast', async (request, reply) => {
-    if (!checkBearer(request, reply, env.STEADFAST_WEBHOOK_TOKEN)) return;
+    const { steadfastWebhookToken } = await getPlatformConfig();
+    if (!checkBearer(request, reply, steadfastWebhookToken)) return;
 
     const schema = z.object({
       notification_type: z.string().optional(),
@@ -142,7 +145,8 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
   // Pathao pushes order_status / order events. Structure:
   // { event: 'order.delivered', merchant_order_id, consignment_id, order_status, updated_at }
   fastify.post('/webhooks/pathao', async (request, reply) => {
-    if (!checkBearer(request, reply, env.PATHAO_WEBHOOK_TOKEN)) return;
+    const { pathaoWebhookToken } = await getPlatformConfig();
+    if (!checkBearer(request, reply, pathaoWebhookToken)) return;
 
     const schema = z.object({
       event: z.string().optional(),
@@ -190,7 +194,8 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
 
   // RedX pushes: { tracking_id, status, updated_at, merchant_invoice_id }
   fastify.post('/webhooks/redx', async (request, reply) => {
-    if (!checkBearer(request, reply, env.REDX_WEBHOOK_TOKEN)) return;
+    const { redxWebhookToken } = await getPlatformConfig();
+    if (!checkBearer(request, reply, redxWebhookToken)) return;
 
     const schema = z.object({
       tracking_id: z.string(),

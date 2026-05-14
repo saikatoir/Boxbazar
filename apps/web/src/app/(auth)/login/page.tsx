@@ -7,8 +7,9 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
-
-// ── Schemas ──────────────────────────────────────────────────────────────────
+import { Input, Label } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 
 const phoneSchema = z.object({
   phone: z.string().regex(/^01[3-9][0-9]{8}$/, 'সঠিক বাংলাদেশি মোবাইল নম্বর দিন'),
@@ -26,13 +27,6 @@ type OtpFormData = z.infer<typeof otpSchema>;
 type EmailFormData = z.infer<typeof emailSchema>;
 type Tab = 'phone' | 'email';
 
-// ── Shared input class ────────────────────────────────────────────────────────
-const inputCls =
-  'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400';
-const btnCls =
-  'w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -63,7 +57,6 @@ export default function LoginPage() {
     router.push('/dashboard');
   }
 
-  // Phone OTP: step 1
   async function onPhoneSubmit({ phone }: PhoneFormData) {
     setLoading(true);
     setError(null);
@@ -78,7 +71,6 @@ export default function LoginPage() {
     }
   }
 
-  // Phone OTP: step 2
   async function onOtpSubmit({ otp }: OtpFormData) {
     setLoading(true);
     setError(null);
@@ -92,7 +84,6 @@ export default function LoginPage() {
     }
   }
 
-  // Email login
   async function onEmailSubmit({ email, password }: EmailFormData) {
     setLoading(true);
     setError(null);
@@ -116,116 +107,160 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">fCommerce Ops</h1>
-        <p className="text-gray-500 mt-1 text-sm">আপনার অ্যাকাউন্টে প্রবেশ করুন</p>
+    <div className="w-full max-w-md">
+      {/* Mobile-only brand */}
+      <div className="lg:hidden text-center mb-6">
+        <div className="inline-flex items-center gap-2 text-primary-700">
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-bold">
+            B
+          </span>
+          <span className="text-lg font-semibold tracking-tight text-neutral-900">BoxBazar</span>
+        </div>
       </div>
+
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+        স্বাগতম, আবার দেখা হল
+      </h1>
+      <p className="text-sm text-neutral-500 mt-1.5">আপনার অ্যাকাউন্টে প্রবেশ করুন।</p>
 
       {/* Tab switcher */}
-      <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-        <button
-          type="button"
-          onClick={() => switchTab('phone')}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            tab === 'phone' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          মোবাইল নম্বর
-        </button>
-        <button
-          type="button"
-          onClick={() => switchTab('email')}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            tab === 'email' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          ইমেইল
-        </button>
+      <div className="flex bg-neutral-100 rounded-lg p-1 mt-6 mb-5">
+        {(['phone', 'email'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => switchTab(t)}
+            className={cn(
+              'flex-1 py-2 text-sm font-medium rounded-md transition-colors',
+              tab === t
+                ? 'bg-white shadow-sm text-primary-700'
+                : 'text-neutral-500 hover:text-neutral-700',
+            )}
+          >
+            {t === 'phone' ? 'মোবাইল নম্বর' : 'ইমেইল'}
+          </button>
+        ))}
       </div>
 
-      {/* Phone tab */}
       {tab === 'phone' && !otpStep && (
         <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              মোবাইল নম্বর
-            </label>
-            <input type="tel" inputMode="numeric" placeholder="01XXXXXXXXX"
-              {...phoneForm.register('phone')} className={inputCls} />
+            <Label>মোবাইল নম্বর</Label>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              placeholder="01XXXXXXXXX"
+              className="h-11"
+              {...phoneForm.register('phone')}
+            />
             {phoneForm.formState.errors.phone && (
-              <p className="mt-1 text-sm text-red-600">{phoneForm.formState.errors.phone.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {phoneForm.formState.errors.phone.message}
+              </p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'পাঠানো হচ্ছে...' : 'OTP পাঠান'}
-          </button>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            OTP পাঠান
+          </Button>
         </form>
       )}
 
-      {/* OTP step */}
       {tab === 'phone' && otpStep && (
         <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">{phone}</span> নম্বরে OTP পাঠানো হয়েছে
+          <p className="text-sm text-neutral-600">
+            <span className="font-medium text-neutral-900">{phone}</span> নম্বরে OTP পাঠানো হয়েছে।
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">OTP কোড</label>
-            <input type="text" inputMode="numeric" maxLength={6} placeholder="------"
+            <Label>OTP কোড</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="------"
+              className="h-12 text-center text-xl tracking-widest font-mono"
               {...otpForm.register('otp')}
-              className={`${inputCls} text-center text-xl tracking-widest`} />
+            />
             {otpForm.formState.errors.otp && (
-              <p className="mt-1 text-sm text-red-600">{otpForm.formState.errors.otp.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">{otpForm.formState.errors.otp.message}</p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'যাচাই হচ্ছে...' : 'প্রবেশ করুন'}
-          </button>
-          <button type="button" onClick={() => { setOtpStep(false); setError(null); otpForm.reset(); }}
-            className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            প্রবেশ করুন
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setOtpStep(false);
+              setError(null);
+              otpForm.reset();
+            }}
+          >
             নম্বর পরিবর্তন করুন
-          </button>
+          </Button>
         </form>
       )}
 
-      {/* Email tab */}
       {tab === 'email' && (
         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল</label>
-            <input type="email" placeholder="example@email.com"
-              {...emailForm.register('email')} className={inputCls} />
+            <Label>ইমেইল</Label>
+            <Input
+              type="email"
+              placeholder="example@email.com"
+              className="h-11"
+              {...emailForm.register('email')}
+            />
             {emailForm.formState.errors.email && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.email.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.email.message}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
-            <input type="password" placeholder="••••••••"
-              {...emailForm.register('password')} className={inputCls} />
+            <Label>পাসওয়ার্ড</Label>
+            <Input
+              type="password"
+              placeholder="••••••••"
+              className="h-11"
+              {...emailForm.register('password')}
+            />
             {emailForm.formState.errors.password && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.password.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.password.message}
+              </p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'প্রবেশ হচ্ছে...' : 'প্রবেশ করুন'}
-          </button>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            প্রবেশ করুন
+          </Button>
         </form>
       )}
 
-      {/* Divider + register CTA */}
-      <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-        <p className="text-sm text-gray-500">
+      <div className="mt-6 pt-5 border-t border-neutral-100 text-center">
+        <p className="text-sm text-neutral-600">
           অ্যাকাউন্ট নেই?{' '}
-          <Link href="/register" className="text-blue-600 font-medium hover:underline">
+          <Link href="/register" className="text-primary-700 font-medium hover:underline">
             নিবন্ধন করুন
           </Link>
         </p>
-        <p className="text-xs text-gray-400 mt-2">১৫ দিন বিনামূল্যে — কোনো কার্ড লাগবে না</p>
+        <p className="text-xs text-neutral-400 mt-1.5">১৫ দিন বিনামূল্যে — কোনো কার্ড লাগবে না</p>
       </div>
     </div>
   );

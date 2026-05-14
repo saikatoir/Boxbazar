@@ -243,7 +243,7 @@ export async function processInboundMessengerEvent(
     history: priorTurns,
     conversationState: conversation.state as EngineConversationState,
     customer: { name: customer.name, phone: customer.phone, knownAddress: knownAddress(customer) },
-    provider: getLlmProvider(),
+    provider: await getLlmProvider(),
     confidenceThreshold: AI_CONFIDENCE_THRESHOLD,
   });
 
@@ -256,7 +256,7 @@ export async function processInboundMessengerEvent(
   // Send the reply (if any).
   const shouldReply = decision.replyText && (decision.action === 'reply' || decision.action === 'reply_and_handoff');
   if (shouldReply && decision.replyText) {
-    const client = messengerClientForStore(store);
+    const client = await messengerClientForStore(store);
     if (client) {
       try {
         await client.sendSenderAction(event.senderPsid, 'mark_seen').catch(() => undefined);

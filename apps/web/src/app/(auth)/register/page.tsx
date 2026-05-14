@@ -7,8 +7,9 @@ import { z } from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
-
-// ── Schemas ───────────────────────────────────────────────────────────────────
+import { Input, Label } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 
 const phoneRegSchema = z.object({
   name: z.string().min(2, 'নাম কমপক্ষে ২ অক্ষরের হতে হবে').max(80),
@@ -17,25 +18,22 @@ const phoneRegSchema = z.object({
 const otpSchema = z.object({
   otp: z.string().length(6, 'OTP অবশ্যই ৬ সংখ্যার হতে হবে').regex(/^\d{6}$/),
 });
-const emailRegSchema = z.object({
-  name: z.string().min(2, 'নাম কমপক্ষে ২ অক্ষরের হতে হবে').max(80),
-  email: z.string().email('সঠিক ইমেইল ঠিকানা দিন'),
-  password: z.string().min(8, 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে'),
-  confirmPassword: z.string(),
-}).refine((d) => d.password === d.confirmPassword, {
-  message: 'পাসওয়ার্ড মিলছে না',
-  path: ['confirmPassword'],
-});
+const emailRegSchema = z
+  .object({
+    name: z.string().min(2, 'নাম কমপক্ষে ২ অক্ষরের হতে হবে').max(80),
+    email: z.string().email('সঠিক ইমেইল ঠিকানা দিন'),
+    password: z.string().min(8, 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে'),
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'পাসওয়ার্ড মিলছে না',
+    path: ['confirmPassword'],
+  });
 
 type PhoneRegData = z.infer<typeof phoneRegSchema>;
 type OtpData = z.infer<typeof otpSchema>;
 type EmailRegData = z.infer<typeof emailRegSchema>;
 type Tab = 'phone' | 'email';
-
-const inputCls =
-  'w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400';
-const btnCls =
-  'w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -68,7 +66,6 @@ export default function RegisterPage() {
     router.push('/onboarding');
   }
 
-  // Phone reg: step 1 — send OTP
   async function onPhoneRegSubmit({ name, phone }: PhoneRegData) {
     setLoading(true);
     setError(null);
@@ -84,7 +81,6 @@ export default function RegisterPage() {
     }
   }
 
-  // Phone reg: step 2 — verify OTP (creates account if new)
   async function onOtpSubmit({ otp }: OtpData) {
     setLoading(true);
     setError(null);
@@ -102,7 +98,6 @@ export default function RegisterPage() {
     }
   }
 
-  // Email reg
   async function onEmailRegSubmit({ name, email, password }: EmailRegData) {
     setLoading(true);
     setError(null);
@@ -126,128 +121,193 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">নতুন অ্যাকাউন্ট</h1>
-        <p className="text-gray-500 mt-1 text-sm">১৫ দিন বিনামূল্যে — কোনো কার্ড লাগবে না</p>
+    <div className="w-full max-w-md">
+      <div className="lg:hidden text-center mb-6">
+        <div className="inline-flex items-center gap-2 text-primary-700">
+          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center text-sm font-bold">
+            B
+          </span>
+          <span className="text-lg font-semibold tracking-tight text-neutral-900">BoxBazar</span>
+        </div>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-        <button type="button" onClick={() => switchTab('phone')}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            tab === 'phone' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}>
-          মোবাইল নম্বর দিয়ে
-        </button>
-        <button type="button" onClick={() => switchTab('email')}
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            tab === 'email' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'
-          }`}>
-          ইমেইল দিয়ে
-        </button>
+      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">নতুন অ্যাকাউন্ট</h1>
+      <p className="text-sm text-neutral-500 mt-1.5">১৫ দিন বিনামূল্যে — কোনো কার্ড লাগবে না।</p>
+
+      <div className="flex bg-neutral-100 rounded-lg p-1 mt-6 mb-5">
+        {(['phone', 'email'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => switchTab(t)}
+            className={cn(
+              'flex-1 py-2 text-sm font-medium rounded-md transition-colors',
+              tab === t
+                ? 'bg-white shadow-sm text-primary-700'
+                : 'text-neutral-500 hover:text-neutral-700',
+            )}
+          >
+            {t === 'phone' ? 'মোবাইল নম্বর দিয়ে' : 'ইমেইল দিয়ে'}
+          </button>
+        ))}
       </div>
 
-      {/* Phone tab: name + phone → OTP */}
       {tab === 'phone' && !otpStep && (
         <form onSubmit={phoneForm.handleSubmit(onPhoneRegSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">আপনার নাম</label>
-            <input type="text" placeholder="যেমন: রাহেলা বেগম"
-              {...phoneForm.register('name')} className={inputCls} />
+            <Label>আপনার নাম</Label>
+            <Input
+              className="h-11"
+              placeholder="যেমন: রাহেলা বেগম"
+              {...phoneForm.register('name')}
+            />
             {phoneForm.formState.errors.name && (
-              <p className="mt-1 text-sm text-red-600">{phoneForm.formState.errors.name.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {phoneForm.formState.errors.name.message}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">মোবাইল নম্বর</label>
-            <input type="tel" inputMode="numeric" placeholder="01XXXXXXXXX"
-              {...phoneForm.register('phone')} className={inputCls} />
+            <Label>মোবাইল নম্বর</Label>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              className="h-11"
+              placeholder="01XXXXXXXXX"
+              {...phoneForm.register('phone')}
+            />
             {phoneForm.formState.errors.phone && (
-              <p className="mt-1 text-sm text-red-600">{phoneForm.formState.errors.phone.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {phoneForm.formState.errors.phone.message}
+              </p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'পাঠানো হচ্ছে...' : 'OTP পাঠান'}
-          </button>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            OTP পাঠান
+          </Button>
         </form>
       )}
 
-      {/* OTP verification step */}
       {tab === 'phone' && otpStep && (
         <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">{pendingPhone}</span> নম্বরে OTP পাঠানো হয়েছে
+          <p className="text-sm text-neutral-600">
+            <span className="font-medium text-neutral-900">{pendingPhone}</span> নম্বরে OTP পাঠানো
+            হয়েছে।
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">OTP কোড</label>
-            <input type="text" inputMode="numeric" maxLength={6} placeholder="------"
+            <Label>OTP কোড</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="------"
+              className="h-12 text-center text-xl tracking-widest font-mono"
               {...otpForm.register('otp')}
-              className={`${inputCls} text-center text-xl tracking-widest`} />
+            />
             {otpForm.formState.errors.otp && (
-              <p className="mt-1 text-sm text-red-600">{otpForm.formState.errors.otp.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">{otpForm.formState.errors.otp.message}</p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'অ্যাকাউন্ট তৈরি হচ্ছে...' : 'নিবন্ধন সম্পন্ন করুন'}
-          </button>
-          <button type="button" onClick={() => { setOtpStep(false); setError(null); otpForm.reset(); }}
-            className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            নিবন্ধন সম্পন্ন করুন
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setOtpStep(false);
+              setError(null);
+              otpForm.reset();
+            }}
+          >
             পেছনে যান
-          </button>
+          </Button>
         </form>
       )}
 
-      {/* Email tab */}
       {tab === 'email' && (
         <form onSubmit={emailForm.handleSubmit(onEmailRegSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">আপনার নাম</label>
-            <input type="text" placeholder="যেমন: রাহেলা বেগম"
-              {...emailForm.register('name')} className={inputCls} />
+            <Label>আপনার নাম</Label>
+            <Input
+              className="h-11"
+              placeholder="যেমন: রাহেলা বেগম"
+              {...emailForm.register('name')}
+            />
             {emailForm.formState.errors.name && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.name.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.name.message}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ইমেইল</label>
-            <input type="email" placeholder="example@email.com"
-              {...emailForm.register('email')} className={inputCls} />
+            <Label>ইমেইল</Label>
+            <Input
+              type="email"
+              className="h-11"
+              placeholder="example@email.com"
+              {...emailForm.register('email')}
+            />
             {emailForm.formState.errors.email && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.email.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.email.message}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
-            <input type="password" placeholder="কমপক্ষে ৮ অক্ষর"
-              {...emailForm.register('password')} className={inputCls} />
+            <Label>পাসওয়ার্ড</Label>
+            <Input
+              type="password"
+              className="h-11"
+              placeholder="কমপক্ষে ৮ অক্ষর"
+              {...emailForm.register('password')}
+            />
             {emailForm.formState.errors.password && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.password.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.password.message}
+              </p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড নিশ্চিত করুন</label>
-            <input type="password" placeholder="আবার পাসওয়ার্ড লিখুন"
-              {...emailForm.register('confirmPassword')} className={inputCls} />
+            <Label>পাসওয়ার্ড নিশ্চিত করুন</Label>
+            <Input
+              type="password"
+              className="h-11"
+              placeholder="আবার পাসওয়ার্ড লিখুন"
+              {...emailForm.register('confirmPassword')}
+            />
             {emailForm.formState.errors.confirmPassword && (
-              <p className="mt-1 text-sm text-red-600">{emailForm.formState.errors.confirmPassword.message}</p>
+              <p className="mt-1.5 text-xs text-red-600">
+                {emailForm.formState.errors.confirmPassword.message}
+              </p>
             )}
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
-          <button type="submit" disabled={loading} className={btnCls}>
-            {loading ? 'অ্যাকাউন্ট তৈরি হচ্ছে...' : 'নিবন্ধন করুন'}
-          </button>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" loading={loading}>
+            নিবন্ধন করুন
+          </Button>
         </form>
       )}
 
-      {/* Login CTA */}
-      <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-        <p className="text-sm text-gray-500">
+      <div className="mt-6 pt-5 border-t border-neutral-100 text-center">
+        <p className="text-sm text-neutral-600">
           আগে থেকে অ্যাকাউন্ট আছে?{' '}
-          <Link href="/login" className="text-blue-600 font-medium hover:underline">
+          <Link href="/login" className="text-primary-700 font-medium hover:underline">
             লগইন করুন
           </Link>
         </p>

@@ -1,21 +1,30 @@
 import { GeminiProvider, MockLlmProvider, type LlmProvider } from '@fcommerce/ai-engine';
 import { env } from '../env.js';
+import { getPlatformConfig } from './platform-config.js';
 
-let provider: LlmProvider | null = null;
+interface ProviderCache {
+  provider: LlmProvider;
+  key: string;
+}
+let cache: ProviderCache | null = null;
 
 /**
- * Resolves the configured LLM provider (singleton). Falls back to the offline
- * mock if `AI_PROVIDER=mock` or no Gemini key is set, so the receptionist
- * pipeline is always runnable in dev.
+ * Resolves the configured LLM provider. Falls back to the offline mock if
+ * `AI_PROVIDER=mock` or no Gemini key is configured (DB or env), so the
+ * receptionist pipeline is always runnable in dev. Cached by (provider,
+ * model, key-tail) so new platform-config saves pick up without a restart.
  */
-export function getLlmProvider(): LlmProvider {
-  if (provider) return provider;
-  const useMock = env.AI_PROVIDER === 'mock' || (!env.AI_PROVIDER && !env.GEMINI_API_KEY);
-  if (useMock || !env.GEMINI_API_KEY) {
-    provider = new MockLlmProvider();
-  } else {
-    provider = new GeminiProvider({ apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL });
-  }
+export async function getLlmProvider(): Promise<LlmProvider> {
+  const cfg = await getPlatformConfig();
+  const useMock = cfg.aiProvider === 'mock' || !cfg.geminiApiKey;
+  const key = useMock
+    ? 'mock'
+    : `gemini:${cfg.geminiModel}:${(cfg.geminiApiKey ?? '').slice(-8)}`;
+  if (cache && cache.key === key) return cache.provider;
+  const provider: LlmProvider = useMock
+    ? new MockLlmProvider()
+    : new GeminiProvider({ apiKey: cfg.geminiApiKey!, model: cfg.geminiModel });
+  cache = { provider, key };
   return provider;
 }
 
