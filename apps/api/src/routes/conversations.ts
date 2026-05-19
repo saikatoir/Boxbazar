@@ -77,6 +77,7 @@ export async function conversationRoutes(fastify: FastifyInstance): Promise<void
           state: convo.state,
           channel: convo.channel,
           aiEnabled: convo.aiEnabled,
+          useAsExample: convo.useAsExample,
           lastMessageAt: convo.lastMessageAt,
           lastAiActionAt: convo.lastAiActionAt,
           customer: convo.customer,
@@ -145,6 +146,9 @@ export async function conversationRoutes(fastify: FastifyInstance): Promise<void
       const body = z
         .object({
           aiEnabled: z.boolean().optional(),
+          // Toggle whether this conversation is used as a few-shot example
+          // for the AI on subsequent customer messages.
+          useAsExample: z.boolean().optional(),
           state: z
             .enum(['new_inquiry', 'product_discussion', 'order_collection', 'order_confirmed', 'human_handoff', 'closed'])
             .optional(),
@@ -158,11 +162,17 @@ export async function conversationRoutes(fastify: FastifyInstance): Promise<void
         where: { id: convo.id },
         data: {
           ...(body.aiEnabled !== undefined ? { aiEnabled: body.aiEnabled } : {}),
+          ...(body.useAsExample !== undefined ? { useAsExample: body.useAsExample } : {}),
           ...(body.state !== undefined ? { state: body.state } : {}),
         },
       });
       return reply.send({
-        conversation: { id: updated.id, state: updated.state, aiEnabled: updated.aiEnabled },
+        conversation: {
+          id: updated.id,
+          state: updated.state,
+          aiEnabled: updated.aiEnabled,
+          useAsExample: updated.useAsExample,
+        },
       });
     },
   );

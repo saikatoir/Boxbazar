@@ -21,7 +21,13 @@ export function serializeCatalog(products: CatalogProduct[]): string {
           : 'no variants';
       const stock = p.stockStatus === 'low_stock' ? ' (LOW STOCK)' : '';
       const desc = p.description ? ` — ${p.description}` : '';
-      return `${i + 1}. id=${p.id} | "${p.name}" | price ৳${taka(p.basePriceCents)}${stock} | ${variants}${desc}`;
+      // Surface keywords so the model can match fuzzy customer phrasing
+      // (e.g. "lal shari" → keyword "red saree") instead of only the canonical name.
+      const kw =
+        p.keywords && p.keywords.length
+          ? ` | also called: ${p.keywords.join(', ')}`
+          : '';
+      return `${i + 1}. id=${p.id} | "${p.name}" | price ৳${taka(p.basePriceCents)}${stock} | ${variants}${desc}${kw}`;
     })
     .join('\n');
 }

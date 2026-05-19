@@ -86,6 +86,12 @@ export interface LlmRequest {
   user: string;
   /** Prior turns, oldest first. `model` = our side, `user` = customer. */
   history?: Array<{ role: 'user' | 'model'; text: string }>;
+  /**
+   * Optional image attachments to include with the latest user turn. The
+   * Gemini provider base64-encodes `bytes` into `inlineData` parts so the
+   * model can read the image alongside the text.
+   */
+  images?: Array<{ mimeType: string; bytes: Uint8Array }>;
   /** Ask the model to return strictly a JSON object. */
   json?: boolean;
   temperature?: number;
@@ -105,6 +111,36 @@ export interface LlmProvider {
 
 // ─── Engine I/O ──────────────────────────────────────────────────────────────
 
+/**
+ * A past conversation that the AI studies as a few-shot example. Sources:
+ *   - the seller's own starred conversations (their real voice), and
+ *   - a curated baseline shipped in the AI engine (BoxBazar best practices,
+ *     including both ✅ "order confirmed" and ❌ "stayed firm on price" flows).
+ *
+ * The optional `label` describes the outcome / lesson so the AI knows whether
+ * the example is something to copy positively or a "this is the line we held"
+ * pattern — e.g. graceful price-discipline.
+ */
+export interface ExampleConversation {
+  turns: ConversationTurn[];
+  /** e.g. "ORDER CONFIRMED", "DECLINED — kept price discipline", "INQUIRY ONLY". */
+  label?: string;
+}
+
+/**
+ * An image (or other supported media) attached to the customer's incoming
+ * message. The pipeline fetches Meta's signed CDN URL and hands the raw
+ * bytes here. Multimodal Stage-2 routes these to Gemini so the AI can
+ * actually see what the customer's pointing at.
+ */
+export interface AttachmentInput {
+  /** e.g. 'image/jpeg', 'image/png', 'image/webp'. */
+  mimeType: string;
+  bytes: Uint8Array;
+  /** Optional source URL (debug / logging only — never passed to the LLM). */
+  sourceUrl?: string;
+}
+
 export interface ReceptionistInput {
   /** The incoming customer message text. */
   incomingText: string;
@@ -119,6 +155,19 @@ export interface ReceptionistInput {
   now?: Date;
   /** Stage-1 confidence below this routes to a human. Default 0.6. */
   confidenceThreshold?: number;
+  /**
+   * Image attachments the customer sent with this message. When present, the
+   * engine skips Stage-1 intent classification (image messages are
+   * effectively always a product inquiry) and routes the images directly
+   * to Stage-2 so Gemini can read them.
+   */
+  attachments?: AttachmentInput[];
+  /**
+   * Seller-flagged example exchanges to inject into the system prompt as
+   * "this is how WE talk to customers." Caller should pre-filter to good
+   * outcomes (no handoff, complete orders) and cap to ~3 entries.
+   */
+  exampleConversations?: ExampleConversation[];
 }
 
 export interface IntentClassification {

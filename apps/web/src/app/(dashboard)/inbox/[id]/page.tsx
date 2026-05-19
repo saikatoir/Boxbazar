@@ -13,6 +13,7 @@ import {
   CheckCheck,
   Package,
   Paperclip,
+  Star,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -62,6 +63,7 @@ interface ConversationDetail {
   state: ConvState;
   channel: string;
   aiEnabled: boolean;
+  useAsExample: boolean;
   lastAiActionAt: string | null;
   customer: { id: string; name: string; phone: string | null; messengerPsid: string | null };
   messages: Message[];
@@ -116,6 +118,17 @@ export default function ConversationDetailPage() {
     },
   });
 
+  // Toggle "use this conversation as a few-shot example for the AI."
+  // The seller stars conversations that show their preferred voice; those
+  // get injected into the system prompt so the AI mimics that style.
+  const toggleExample = useMutation({
+    mutationFn: (useAsExample: boolean) =>
+      apiClient.patch(`/api/conversations/${id}`, { useAsExample }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversation', id] });
+    },
+  });
+
   const resolveHandoffs = useMutation({
     mutationFn: () => apiClient.post(`/api/conversations/${id}/resolve-handoffs`, {}),
     onSuccess: () => {
@@ -154,6 +167,29 @@ export default function ConversationDetailPage() {
             {convo.customer.phone ?? 'ফোন নম্বর নেই'} · {convo.channel}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => toggleExample.mutate(!convo.useAsExample)}
+          disabled={toggleExample.isPending}
+          title={
+            convo.useAsExample
+              ? 'AI কে এই কথোপকথন থেকে শেখানো বন্ধ করুন'
+              : 'AI কে এই কথোপকথন থেকে আপনার ভাষার ধরন শেখান (training example হিসেবে যোগ করুন)'
+          }
+          aria-label="Toggle example for AI training"
+          className={cn(
+            'p-1.5 rounded-md transition-colors flex-shrink-0',
+            convo.useAsExample
+              ? 'text-amber-500 hover:bg-amber-50'
+              : 'text-neutral-300 hover:text-amber-500 hover:bg-amber-50',
+          )}
+        >
+          <Star
+            className="w-4 h-4"
+            fill={convo.useAsExample ? 'currentColor' : 'none'}
+            strokeWidth={2}
+          />
+        </button>
         <Button
           variant={convo.aiEnabled ? 'primary' : 'secondary'}
           size="sm"

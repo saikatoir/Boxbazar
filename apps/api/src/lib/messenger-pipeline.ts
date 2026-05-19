@@ -1,13 +1,20 @@
 import {
   runReceptionist,
+  pickCuratedExamples,
+  type AttachmentInput,
   type CatalogProduct,
   type ConversationState as EngineConversationState,
   type ConversationTurn,
   type DraftOrder,
+  type ExampleConversation,
   type ReceptionistDecision,
   type StoreProfile,
 } from '@fcommerce/ai-engine';
-import { MetaAuthError, type NormalizedMessengerEvent } from '@fcommerce/meta-sdk';
+import {
+  fetchAttachment,
+  MetaAuthError,
+  type NormalizedMessengerEvent,
+} from '@fcommerce/meta-sdk';
 import type { Conversation, Customer, HandoffReason, Prisma, Store } from '@fcommerce/db';
 import { prisma } from './prisma.js';
 import { messengerClientForStore } from './meta.js';
@@ -216,28 +223,113 @@ export async function processInboundMessengerEvent(
     data: { lastMessageAt: new Date() },
   });
 
-  // No text to reason over, or AI disabled → record only, seller handles it.
-  if (!event.text) return { status: 'recorded_no_ai', reason: 'attachment-only message', conversationId: conversation.id };
+  // ── Per-customer rate limit (budget floor) ────────────────────────────────
+  // Cap AI-processed messages per customer per hour. Beyond the cap: keep
+  // persisting the message but skip the Gemini call. Prevents a single chatty
+  // (or hostile) customer from blowing the $2 / seller / month budget.
+  const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+  const RATE_LIMIT_MAX = 30;
+  const recentInbound = await prisma.message.count({
+    where: {
+      conversationId: conversation.id,
+      direction: 'inbound',
+      createdAt: { gt: new Date(Date.now() - RATE_LIMIT_WINDOW_MS) },
+    },
+  });
+  if (recentInbound > RATE_LIMIT_MAX) {
+    return {
+      status: 'recorded_no_ai',
+      reason: `rate limit: ${recentInbound} inbound msgs in last hour (cap ${RATE_LIMIT_MAX})`,
+      conversationId: conversation.id,
+    };
+  }
+
+  // Has the message got anything useful for the AI to act on?
+  const imageAttachmentRefs = event.attachments
+    .filter((a): a is { type: string; url: string } => a.type === 'image' && typeof a.url === 'string' && a.url.length > 0);
+  if (!event.text && imageAttachmentRefs.length === 0) {
+    return { status: 'recorded_no_ai', reason: 'non-image attachment only', conversationId: conversation.id };
+  }
   if (!store.aiEnabled) return { status: 'recorded_no_ai', reason: 'AI disabled for store', conversationId: conversation.id };
   if (!conversation.aiEnabled) return { status: 'recorded_no_ai', reason: 'AI disabled for conversation', conversationId: conversation.id };
   if (!store.fbPageAccessTokenEncrypted) return { status: 'recorded_no_ai', reason: 'store not connected to a page', conversationId: conversation.id };
 
-  const [products, history] = await Promise.all([
+  // Fetch the customer's image attachments from Meta's CDN in parallel with
+  // everything else. Cap to MAX_IMAGES so a customer can't spam a 20-image
+  // album and balloon the input token count.
+  const MAX_IMAGES = 3;
+  const imageFetchUrls = imageAttachmentRefs.slice(0, MAX_IMAGES).map((a) => a.url);
+
+  const [products, history, exampleConvos, fetchedImages] = await Promise.all([
     prisma.product.findMany({ where: { storeId: store.id, active: true } }),
     prisma.message.findMany({
       where: { conversationId: conversation.id, text: { not: null } },
       orderBy: { createdAt: 'asc' },
       take: HISTORY_LIMIT + 1,
     }),
+    // Seller-flagged "use this style" conversations — cap at 3 most-recent so
+    // the system prompt stays bounded. Exclude the current convo and any with
+    // < 2 messages (no signal to learn from).
+    prisma.conversation.findMany({
+      where: {
+        storeId: store.id,
+        useAsExample: true,
+        NOT: { id: conversation.id },
+      },
+      orderBy: { lastMessageAt: 'desc' },
+      take: 3,
+      include: {
+        messages: {
+          where: { text: { not: null } },
+          orderBy: { createdAt: 'asc' },
+          take: 10,
+        },
+      },
+    }),
+    Promise.all(imageFetchUrls.map((u) => fetchAttachment(u))),
   ]);
+
+  const imageInputs: AttachmentInput[] = [];
+  fetchedImages.forEach((f, i) => {
+    if (!f) return;
+    const sourceUrl = imageFetchUrls[i] ?? undefined;
+    imageInputs.push({ mimeType: f.mimeType, bytes: f.bytes, sourceUrl });
+  });
   // Drop the message we just inserted from history (it's `incomingText`).
   const priorTurns: ConversationTurn[] = history
     .filter((m) => m.metaMessageId !== event.mid)
     .slice(-HISTORY_LIMIT)
     .map((m) => ({ role: m.direction === 'inbound' ? 'customer' : 'agent', text: m.text ?? '' }));
 
+  // Seller's own starred conversations come first — these are their actual
+  // voice. Drop anything with < 2 messages (no signal to learn from).
+  const starredExamples: ExampleConversation[] = exampleConvos
+    .map((c) => ({
+      turns: c.messages.map((m) => ({
+        role: (m.direction === 'inbound' ? 'customer' : 'agent') as 'customer' | 'agent',
+        text: m.text ?? '',
+      })),
+      label: 'STARRED BY SELLER',
+    }))
+    .filter((ex) => ex.turns.length >= 2);
+
+  // Pad with curated BoxBazar baseline examples up to 3 total. These show the
+  // AI both successful flows AND graceful price-discipline holds (declined
+  // unreasonable discounts politely). When the seller has 3+ starred, no
+  // curated picks are added — their voice wins.
+  const FEW_SHOT_TARGET = 3;
+  const padCount = Math.max(0, FEW_SHOT_TARGET - starredExamples.length);
+  const curatedFill: ExampleConversation[] = pickCuratedExamples(padCount).map((c) => ({
+    turns: c.turns,
+    label: c.label,
+  }));
+  const exampleConversations: ExampleConversation[] = [
+    ...starredExamples.slice(0, FEW_SHOT_TARGET),
+    ...curatedFill,
+  ];
+
   const decision = await runReceptionist({
-    incomingText: event.text,
+    incomingText: event.text ?? '',
     store: storeProfile(store),
     catalog: toCatalog(products),
     history: priorTurns,
@@ -245,6 +337,8 @@ export async function processInboundMessengerEvent(
     customer: { name: customer.name, phone: customer.phone, knownAddress: knownAddress(customer) },
     provider: await getLlmProvider(),
     confidenceThreshold: AI_CONFIDENCE_THRESHOLD,
+    exampleConversations,
+    attachments: imageInputs,
   });
 
   // Update conversation state regardless of action.

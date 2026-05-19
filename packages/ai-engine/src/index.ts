@@ -7,6 +7,8 @@ export { serializeCatalog, matchProduct } from './catalog.js';
 export { toneInstruction, TONE_DESCRIPTIONS } from './tone.js';
 export { TEMPLATES, applyDisclosureFooter } from './templates.js';
 export { isWithinWorkingHours } from './util.js';
+export { CURATED_EXAMPLES, pickCuratedExamples } from './curated-examples.js';
+export type { CuratedExample, ExampleOutcome } from './curated-examples.js';
 
 export { GeminiProvider } from './providers/gemini.js';
 export type { GeminiProviderOptions } from './providers/gemini.js';
@@ -22,6 +24,8 @@ export type {
   StoreProfile,
   CustomerProfile,
   ConversationTurn,
+  ExampleConversation,
+  AttachmentInput,
   LlmRequest,
   LlmResponse,
   LlmProvider,

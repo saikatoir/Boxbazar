@@ -1,15 +1,21 @@
 import type { AiToneProfile } from './types.js';
 
-/** Short, instruction-style description of how each tone profile should sound. */
+/**
+ * Tone profiles describe register only — formality, energy, choice of Bangla
+ * vs Banglish. The actual form of address (bhai / apu / by name / neutral)
+ * is computed PER CONVERSATION from the customer's name and how they write,
+ * not baked into the tone — see prompts.ts buildResponsePrompt.
+ */
 export const TONE_DESCRIPTIONS: Record<AiToneProfile, string> = {
   formal_apu:
-    'Polite, warm, slightly formal Bangla. Address the customer as "apu" or "vai" respectfully. ' +
-    'Use "আপনি" form. Avoid slang. Keep a professional shop-owner register.',
+    'Polite, warm, slightly formal register. Use "আপনি" form when speaking Bangla. ' +
+    "No slang. Sound like an experienced shop owner who respects the customer's time. " +
+    'Match the language the customer is using (Bangla, English, or Banglish).',
   casual_apu:
-    'Friendly, casual Bangla / Banglish. Address the customer as "apu" or "vai". ' +
-    'A relaxed conversational tone, like chatting with a regular customer. Light, never rude.',
+    'Friendly, casual conversational register. Use natural Bangla or Banglish — whichever the customer uses. ' +
+    'Sound like a real shop owner texting on a phone: short, warm, easy.',
   friendly_bhai:
-    'Easygoing, friendly Banglish with a "bhai/apu" vibe. Approachable and quick. ' +
+    'Easygoing, approachable register in Banglish or Bangla — mirror the customer. ' +
     'Conversational, never stiff, but still respectful.',
 };
 

@@ -10,9 +10,18 @@ export interface GeminiProviderOptions {
   timeoutMs?: number;
 }
 
+/**
+ * A single content part in Gemini's `contents` array — either text or an
+ * inline image. The Gemini REST API accepts mixed parts on the same turn,
+ * so we can send `[{ text: "what is this?" }, { inlineData: <img> }]`.
+ */
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
 interface GeminiContent {
   role: 'user' | 'model';
-  parts: Array<{ text: string }>;
+  parts: GeminiPart[];
 }
 
 interface GeminiResponseBody {
@@ -53,7 +62,19 @@ export class GeminiProvider implements LlmProvider {
       if (!turn.text?.trim()) continue;
       contents.push({ role: turn.role, parts: [{ text: turn.text }] });
     }
-    contents.push({ role: 'user', parts: [{ text: req.user }] });
+    // Latest user turn: text first, then any image parts. Order matters —
+    // putting text first gives the model the question before the image.
+    const userParts: GeminiPart[] = [{ text: req.user }];
+    for (const img of req.images ?? []) {
+      if (!img.bytes || img.bytes.length === 0) continue;
+      userParts.push({
+        inlineData: {
+          mimeType: img.mimeType,
+          data: Buffer.from(img.bytes).toString('base64'),
+        },
+      });
+    }
+    contents.push({ role: 'user', parts: userParts });
 
     const body: Record<string, unknown> = {
       systemInstruction: { parts: [{ text: req.system }] },

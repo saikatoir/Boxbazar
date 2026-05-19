@@ -1,15 +1,25 @@
 import type {
+  AttachmentInput,
   CatalogProduct,
   ConversationState,
   ConversationTurn,
   CustomerProfile,
+  ExampleConversation,
   IntentClassification,
   LlmProvider,
+  LlmResponse,
   StoreProfile,
 } from './types.js';
 import { buildResponsePrompt } from './prompts.js';
 import { parseJsonLoose } from './util.js';
 import type { RawOrderDraft } from './order-extraction.js';
+
+/**
+ * Defensive per-image cap. The Meta SDK fetcher already enforces this;
+ * we re-check here so the engine package stays safe even when callers pass
+ * bytes from another source. Oversized images are silently dropped.
+ */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export interface ResponseOutput {
   reply: string;
@@ -19,8 +29,19 @@ export interface ResponseOutput {
   needsHuman: boolean;
   orderDraftRaw: RawOrderDraft | null;
   raw: unknown;
-  /** True when the model output could not be parsed; caller should fall back. */
+  /**
+   * True when the model's output could not be parsed as JSON even after one
+   * retry. Caller (engine.ts) treats this as a soft handoff. Distinct from
+   * `needsHuman`, which reflects what the model itself said.
+   */
   parseFailed: boolean;
+  /** Token accounting from the model, when the provider returns it. */
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    /** LLM calls made for this single generation (1 normal, 2 if retry kicked in). */
+    calls: number;
+  };
 }
 
 function coerceOrderDraft(v: unknown): RawOrderDraft | null {
@@ -49,6 +70,40 @@ function coerceOrderDraft(v: unknown): RawOrderDraft | null {
   };
 }
 
+/**
+ * Trim the attachment list to images whose byte length is within the cap.
+ * Returns the safe-to-send images. `undefined` when nothing survives so the
+ * provider call doesn't include an empty `images` array.
+ */
+function sanitizeImages(
+  attachments: AttachmentInput[] | undefined,
+): Array<{ mimeType: string; bytes: Uint8Array }> | undefined {
+  if (!attachments?.length) return undefined;
+  const safe = attachments
+    .filter((a) => a.bytes && a.bytes.length > 0 && a.bytes.length <= MAX_IMAGE_BYTES)
+    .map((a) => ({ mimeType: a.mimeType, bytes: a.bytes }));
+  return safe.length > 0 ? safe : undefined;
+}
+
+/**
+ * Stage-2 nudge appended on retry. Kept short to minimise extra input tokens.
+ */
+const RETRY_NUDGE =
+  '\n\nIMPORTANT: your previous response could not be parsed. Return ONLY a single JSON object, no markdown fences, no commentary, no explanatory prose. Start directly with { and end with }.';
+
+function tryParse(text: string): Record<string, unknown> | null {
+  try {
+    return parseJsonLoose<Record<string, unknown>>(text);
+  } catch {
+    return null;
+  }
+}
+
+function sumDefined(a: number | undefined, b: number | undefined): number | undefined {
+  if (a == null && b == null) return undefined;
+  return (a ?? 0) + (b ?? 0);
+}
+
 /** Stage 2 — response generation + order entity extraction. */
 export async function generateResponse(args: {
   incomingText: string;
@@ -59,7 +114,11 @@ export async function generateResponse(args: {
   state: ConversationState;
   intent: IntentClassification;
   provider: LlmProvider;
+  examples?: ExampleConversation[];
+  attachments?: AttachmentInput[];
 }): Promise<ResponseOutput> {
+  const hasImages = (args.attachments?.length ?? 0) > 0;
+  const images = sanitizeImages(args.attachments);
   const { system, user, geminiHistory } = buildResponsePrompt({
     incomingText: args.incomingText,
     history: args.history,
@@ -68,30 +127,77 @@ export async function generateResponse(args: {
     customer: args.customer,
     state: args.state,
     intent: args.intent,
+    examples: args.examples,
+    hasImages,
   });
 
-  const res = await args.provider.generate({
+  // First attempt — natural-variation temperature.
+  // Provider errors propagate; engine.ts wraps them as `llm_error` handoffs.
+  const res: LlmResponse = await args.provider.generate({
     system,
     user,
     history: geminiHistory,
     json: true,
-    temperature: 0.5,
-    maxOutputTokens: 1024,
+    images,
+    // Higher temperature so phrasing varies turn-to-turn (combats the
+    // "same robotic line every time" feel). Low enough that order math
+    // and structured output stay deterministic.
+    temperature: 0.7,
+    // Generous output budget so the model can actually answer questions
+    // like "what do you sell" with a 2-3 product overview instead of
+    // a one-liner.
+    maxOutputTokens: 2048,
   });
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = parseJsonLoose<Record<string, unknown>>(res.text);
-  } catch {
+  let calls = 1;
+  let lastRaw: unknown = res.raw;
+  let inputTokens = res.usage?.inputTokens;
+  let outputTokens = res.usage?.outputTokens;
+
+  let parsed = tryParse(res.text);
+
+  // Retry once with a stricter, lower-temperature pass if the model
+  // returned unparseable JSON. Recovers the common "stray ```json fence" /
+  // "explanatory preamble" failure modes without falling back to a template.
+  if (!parsed) {
+    try {
+      const retry = await args.provider.generate({
+        system: system + RETRY_NUDGE,
+        user,
+        history: geminiHistory,
+        json: true,
+        images,
+        temperature: 0.1,
+        maxOutputTokens: 2048,
+      });
+      calls = 2;
+      lastRaw = retry.raw;
+      inputTokens = sumDefined(inputTokens, retry.usage?.inputTokens);
+      outputTokens = sumDefined(outputTokens, retry.usage?.outputTokens);
+      parsed = tryParse(retry.text);
+    } catch {
+      // Retry itself errored: fall through to parseFailed below with the
+      // first call's raw output. Don't escalate to engine-level error —
+      // the original call succeeded structurally, just unparseably.
+    }
+  }
+
+  const usage = { inputTokens, outputTokens, calls };
+
+  if (!parsed) {
     return {
       reply: '',
       catalogMiss: false,
       discountRequested: false,
       offTopic: false,
-      needsHuman: true,
+      // The model itself said nothing about needing a human — that's the
+      // engine's call based on `parseFailed`. Keep these flags faithful to
+      // the model's intent only.
+      needsHuman: false,
       orderDraftRaw: null,
-      raw: res.raw,
+      raw: lastRaw,
       parseFailed: true,
+      usage,
     };
   }
 
@@ -102,7 +208,8 @@ export async function generateResponse(args: {
     offTopic: parsed['offTopic'] === true,
     needsHuman: parsed['needsHuman'] === true,
     orderDraftRaw: coerceOrderDraft(parsed['orderDraft']),
-    raw: res.raw,
+    raw: lastRaw,
     parseFailed: false,
+    usage,
   };
 }
