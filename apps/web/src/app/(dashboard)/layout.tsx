@@ -15,8 +15,11 @@ import {
   Menu,
   X,
   KeyRound,
+  Crown,
+  Eye,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { useMe } from '@/lib/use-me';
 import { cn } from '@/lib/cn';
 
 type NavItem = {
@@ -24,6 +27,17 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
+  /** If true, hide this entry unless the current user is a platform admin. */
+  adminOnly?: boolean;
+  /** If true, hide unless the user is the platform owner. */
+  ownerOnly?: boolean;
+  /**
+   * If true, this item is visible during admin-impersonation sessions. Only
+   * configuration pages are whitelisted — admin opens a user's account to
+   * configure settings on their behalf, not to view their private data
+   * (inbox, orders, dashboard analytics).
+   */
+  showInImpersonation?: boolean;
 };
 
 const navItems: readonly NavItem[] = [
@@ -33,8 +47,9 @@ const navItems: readonly NavItem[] = [
   { href: '/products', label: 'পণ্য', icon: Package },
   { href: '/orders', label: 'অর্ডার', icon: ShoppingCart },
   { href: '/reconciliation', label: 'কুরিয়ার পেমেন্ট', icon: Wallet },
-  { href: '/settings', label: 'সেটিংস', icon: Settings },
-  { href: '/platform-setup', label: 'API Keys', icon: KeyRound },
+  { href: '/settings', label: 'সেটিংস', icon: Settings, showInImpersonation: true },
+  { href: '/platform-setup', label: 'API Keys', icon: KeyRound, adminOnly: true },
+  { href: '/owner', label: 'Admin panel', icon: Crown, ownerOnly: true },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {
@@ -56,16 +71,38 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const impersonation = useAuthStore((s) => s.impersonation);
+  const stopImpersonation = useAuthStore((s) => s.stopImpersonation);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Sync the latest isAdmin / isOwner / mfaEnabled flags from the server on dashboard load.
+  // We skip this while impersonating because /api/auth/me would return the
+  // target user's perspective and overwrite the owner-side flags we stashed.
+  useMe(!!impersonation);
 
   function handleLogout() {
     clearAuth();
     router.push('/login');
   }
 
+  function handleStopImpersonation() {
+    stopImpersonation();
+    router.push('/owner');
+  }
+
+  const visibleNav = navItems.filter((i) => {
+    if (i.adminOnly && !user?.isAdmin) return false;
+    if (i.ownerOnly && !user?.isOwner) return false;
+    // Impersonation: hide everything except the explicit configuration
+    // whitelist (only /settings today). Admin is here to configure the
+    // user's account — not to read their inbox or browse their orders.
+    if (impersonation && !i.showInImpersonation) return false;
+    return true;
+  });
+
   // Compute active item label for the mobile topbar.
   // We pick the most-specific match so /orders/pending wins over /orders.
-  const activeItem = [...navItems]
+  const activeItem = [...visibleNav]
     .reverse()
     .find((i) => isActive(pathname, i));
 
@@ -90,7 +127,7 @@ export default function DashboardLayout({
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNav.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;
           return (
@@ -167,6 +204,28 @@ export default function DashboardLayout({
 
       {/* Main column */}
       <main className="flex-1 min-w-0 md:ml-60">
+        {/* Impersonation banner — top of every dashboard page when active. */}
+        {impersonation && (
+          <div className="sticky top-0 z-40 flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-amber-950 border-b border-amber-600/40 shadow-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <p className="text-xs font-medium truncate">
+                Viewing as <span className="font-mono bg-amber-900/10 px-1.5 py-0.5 rounded">{impersonation.target.publicId ?? '----'}</span>{' '}
+                {impersonation.target.name}
+                <span className="ml-2 text-amber-900/60">— configuration access only, all actions logged to your admin account</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStopImpersonation}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-900 text-amber-50 hover:bg-amber-950 text-xs font-medium transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Stop impersonating
+            </button>
+          </div>
+        )}
+
         {/* Mobile topbar */}
         <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-3 bg-white/90 backdrop-blur border-b border-neutral-200">
           <button
