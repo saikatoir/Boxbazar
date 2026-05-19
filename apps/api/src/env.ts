@@ -22,6 +22,18 @@ const envSchema = z.object({
   STEADFAST_WEBHOOK_TOKEN: z.string().optional(),
   PATHAO_WEBHOOK_TOKEN: z.string().optional(),
   REDX_WEBHOOK_TOKEN: z.string().optional(),
+  // SMTP for sending admin MFA codes. All optional — if SMTP_HOST is unset,
+  // codes are logged to API stdout with a [MFA DEV-MODE] tag instead.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_SECURE: z.enum(['true', 'false']).optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  // The single platform owner. Whoever logs in with this email via the
+  // owner-login flow (/api/auth/owner/...) becomes isOwner=true and gets
+  // /owner panel access. Compared case-insensitively.
+  OWNER_EMAIL: z.string().email().default('saikat351h@gmail.com'),
   STATUS_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(4 * 60 * 60 * 1000),
   ENABLE_STATUS_POLLER: z.enum(['true', 'false']).default('true'),
   PORT: z.coerce.number().int().positive().default(3001),

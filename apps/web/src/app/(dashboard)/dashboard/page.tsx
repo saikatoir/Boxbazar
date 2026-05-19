@@ -24,20 +24,22 @@ interface AiSettingsResp {
   minProductsForAi: number;
 }
 
-interface PlatformConfigResp {
-  config: { ready: { messengerWebhook: boolean } };
+interface PlatformStatusResp {
+  ready: { messengerWebhook: boolean };
+  configured: { metaApp: boolean; messengerVerifyToken: boolean; gemini: boolean };
 }
 
 function SetupChecklist({ token }: { token: string | null }) {
   const [state, setState] = useState<AiSettingsResp | null>(null);
-  const [platform, setPlatform] = useState<PlatformConfigResp['config'] | null>(null);
+  const [platform, setPlatform] = useState<PlatformStatusResp | null>(null);
 
   useEffect(() => {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    fetch('/api/platform/config', { headers })
+    // Lightweight readiness probe — no admin/MFA required, only booleans.
+    fetch('/api/platform/config/status', { headers })
       .then((r) => r.json())
-      .then((d: PlatformConfigResp) => setPlatform(d.config))
+      .then((d: PlatformStatusResp) => setPlatform(d))
       .catch(console.error);
     fetch('/api/stores', { headers })
       .then((r) => r.json())
@@ -53,6 +55,7 @@ function SetupChecklist({ token }: { token: string | null }) {
 
   if (!state || !platform) return null;
   const platformDone = platform.ready.messengerWebhook;
+  void platform.configured;
   const fbDone = !!state.store.facebook;
   const productsDone = state.productCount >= state.minProductsForAi;
   const aiDone = state.store.ai.enabled;

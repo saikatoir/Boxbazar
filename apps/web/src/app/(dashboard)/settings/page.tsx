@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Power,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { PageContainer, PageHeader } from '@/components/ui/PageHeader';
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Label, Select, Textarea, FieldHint } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { MfaCodeModal } from '@/components/MfaCodeModal';
 
 /* ---------------------------------------------------------------- couriers */
 
@@ -134,14 +136,94 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {selectedStore && (
-        <div className="space-y-6">
-          <FacebookCard storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
-          <AiReceptionistCard storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
-          <CourierSection storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
-        </div>
-      )}
+      <div className="space-y-6">
+        <TwoFactorCard onFlash={toast} />
+
+        {selectedStore && (
+          <>
+            <FacebookCard storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
+            <AiReceptionistCard storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
+            <CourierSection storeId={selectedStore} authHeader={authHeader} onFlash={toast} />
+          </>
+        )}
+      </div>
     </PageContainer>
+  );
+}
+
+/* ------------------------------------------------- Two-Factor card */
+
+function TwoFactorCard({ onFlash }: { onFlash: FlashFn }) {
+  const user = useAuthStore((s) => s.user);
+  const hasRecentMfa = useAuthStore((s) => s.hasRecentMfa);
+  const [modalOpen, setModalOpen] = useState(false);
+  const mfaEnabled = user?.mfaEnabled === true;
+  const isAdmin = user?.isAdmin === true;
+
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title={
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-primary-600" />
+              Two-Factor Authentication
+            </span>
+          }
+          description={
+            isAdmin
+              ? 'Required to access platform API keys. We email a 6-character code (2 letters + 4 digits) when you verify.'
+              : 'Recommended even for non-admin accounts. Codes are emailed when you verify.'
+          }
+          action={
+            <Badge tone={mfaEnabled ? 'success' : 'neutral'} dot>
+              {mfaEnabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          }
+        />
+        <CardBody>
+          {!user?.email && (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+              You need a verified email on your account before enabling 2FA. Add an email and try again.
+            </div>
+          )}
+          {user?.email && !mfaEnabled && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-neutral-600">
+                Enable to require a one-time emailed code when accessing platform settings.
+              </p>
+              <Button onClick={() => setModalOpen(true)} leftIcon={<ShieldCheck className="w-4 h-4" />}>
+                Enable 2FA
+              </Button>
+            </div>
+          )}
+          {mfaEnabled && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-neutral-600">
+                2FA is enabled.{' '}
+                {isAdmin && (
+                  <>
+                    {hasRecentMfa()
+                      ? 'Your admin session is verified.'
+                      : 'Your admin session is unverified — you will be prompted when accessing platform settings.'}
+                  </>
+                )}
+              </p>
+              <Badge tone="success">Enabled</Badge>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+      <MfaCodeModal
+        open={modalOpen}
+        purpose="enroll"
+        onSuccess={() => {
+          setModalOpen(false);
+          onFlash('Two-factor authentication enabled.');
+        }}
+        onClose={() => setModalOpen(false)}
+      />
+    </>
   );
 }
 

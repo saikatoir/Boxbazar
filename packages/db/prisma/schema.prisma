@@ -151,6 +151,20 @@ model User {
   lastLoginAt        DateTime?          @db.Timestamptz()
   subscriptionTier   SubscriptionTier   @default(trial)
   subscriptionStatus SubscriptionStatus @default(active)
+  // Platform admin can access /platform-setup. Auto-promoted at register time
+  // when no admin exists yet (and the migration promotes the earliest user).
+  isAdmin            Boolean            @default(false)
+  // Platform OWNER — the BoxBazar operator. One per deployment, identified by
+  // the OWNER_EMAIL env var. Can list every user + impersonate them via the
+  // /owner panel. Strict superset of isAdmin (owner is always also admin).
+  isOwner            Boolean            @default(false)
+  // 4-character public user ID: 2 letters (A-Z minus I/O) + 2 digits (2-9
+  // minus 0/1) at random positions, e.g. "K3X7", "4A2B". Surfaced in the
+  // owner panel and ops UIs. Nullable because the migration backfills.
+  publicId           String?            @unique @db.VarChar(4)
+  // Two-factor authentication via email-delivered one-time codes.
+  mfaEnabled         Boolean            @default(false)
+  mfaEnrolledAt      DateTime?          @db.Timestamptz()
 
   stores             Store[]
   customers          Customer[]
@@ -159,8 +173,31 @@ model User {
   chatParseAttempts  ChatParseAttempt[]
   payoutBatches      PayoutBatch[]
   refreshTokens      RefreshToken[]
+  mfaCodes           MfaCode[]
 
   @@map("users")
+}
+
+enum MfaCodePurpose {
+  enroll
+  challenge
+  owner_login
+}
+
+model MfaCode {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String         @db.Uuid
+  codeHash    String
+  purpose     MfaCodePurpose
+  expiresAt   DateTime       @db.Timestamptz()
+  consumedAt  DateTime?      @db.Timestamptz()
+  attempts    Int            @default(0)
+  createdAt   DateTime       @default(now()) @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("mfa_codes")
 }
 
 model OtpCode {
@@ -285,6 +322,10 @@ model Conversation {
   channel        ConversationChannel @default(messenger)
   state          ConversationState   @default(new_inquiry)
   aiEnabled      Boolean             @default(true)
+  // Seller-flagged: include this conversation as a few-shot example in the
+  // AI's system prompt. Picks the seller's own voice / tone / register so
+  // the AI starts mimicking how THEY actually talk to their customers.
+  useAsExample   Boolean             @default(false)
   lastMessageAt  DateTime?           @db.Timestamptz()
   lastAiActionAt DateTime?           @db.Timestamptz()
   createdAt      DateTime            @default(now()) @db.Timestamptz()

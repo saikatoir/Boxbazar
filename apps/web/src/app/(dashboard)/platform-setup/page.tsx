@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { PageContainer, PageHeader } from '@/components/ui/PageHeader';
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input, Label, Select, FieldHint } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { MfaCodeModal } from '@/components/MfaCodeModal';
 
 /* --------------------------------------------------------- types */
 
@@ -114,11 +116,19 @@ function CopyField({ value, label }: { value: string; label: string }) {
 
 export default function PlatformSetupPage() {
   const { token } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const hasRecentMfa = useAuthStore((s) => s.hasRecentMfa);
   const toast = useToast();
   const authHeader = { Authorization: `Bearer ${token}` };
 
+  const isAdmin = user?.isAdmin === true;
+  const mfaEnabled = user?.mfaEnabled === true;
+
   const [config, setConfig] = useState<PlatformConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  // Modal state for the MFA gate. Opens automatically when the user is an
+  // admin but lacks a recent MFA session, and re-opens on 403 MFA_REQUIRED.
+  const [mfaModalOpen, setMfaModalOpen] = useState(false);
 
   // Form state (public + secret patches).
   const [metaAppId, setMetaAppId] = useState('');
@@ -140,7 +150,13 @@ export default function PlatformSetupPage() {
   });
 
   const load = useCallback(async () => {
+    if (!isAdmin || !hasRecentMfa()) return;
     const res = await fetch('/api/platform/config', { headers: authHeader });
+    if (res.status === 403) {
+      // Server says MFA expired — open the modal again.
+      setMfaModalOpen(true);
+      return;
+    }
     const body = (await res.json()) as { config: PlatformConfig };
     setConfig(body.config);
     setMetaAppId(body.config.metaAppId ?? '');
@@ -150,11 +166,21 @@ export default function PlatformSetupPage() {
     setAiProvider(body.config.aiProvider === 'mock' ? 'mock' : 'gemini');
     setBulkSmsSenderId(body.config.bulkSmsSenderId || 'BoxBazar');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, isAdmin]);
 
   useEffect(() => {
-    if (token) load();
-  }, [load, token]);
+    if (!token) return;
+    if (!isAdmin) return; // non-admin path renders an early error below
+    if (!mfaEnabled) {
+      // User must enable 2FA from /settings first.
+      return;
+    }
+    if (!hasRecentMfa()) {
+      setMfaModalOpen(true);
+      return;
+    }
+    load();
+  }, [load, token, isAdmin, mfaEnabled, hasRecentMfa]);
 
   function setSecret(k: SecretKey, v: string) {
     setSecrets((s) => ({ ...s, [k]: v }));
@@ -182,6 +208,12 @@ export default function PlatformSetupPage() {
         headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify(payload),
       });
+      if (res.status === 403) {
+        // MFA session expired mid-edit. Prompt for a fresh code; keep the
+        // form values intact so the user can hit Save again afterwards.
+        setMfaModalOpen(true);
+        return;
+      }
       const body = (await res.json()) as { config?: PlatformConfig; message?: string };
       if (!res.ok || !body.config) throw new Error(body.message ?? 'Save failed');
       setConfig(body.config);
@@ -204,11 +236,104 @@ export default function PlatformSetupPage() {
     }
   }
 
-  if (!config) {
+  // ── Access gates ────────────────────────────────────────────────────────
+  if (!isAdmin) {
     return (
       <PageContainer>
-        <PageHeader title="Platform API keys" description="Loading…" />
+        <PageHeader
+          title="Platform API keys"
+          description="This area is for the platform administrator."
+        />
+        <Card>
+          <CardBody className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-neutral-900">Admin access required</p>
+              <p className="text-xs text-neutral-600">
+                Only the platform administrator can view or change the API credentials.
+                If you should have access, ask the current admin to promote your account.
+              </p>
+            </div>
+          </CardBody>
+        </Card>
       </PageContainer>
+    );
+  }
+
+  if (!mfaEnabled) {
+    return (
+      <PageContainer>
+        <PageHeader
+          title="Platform API keys"
+          description="Enable two-factor authentication before accessing these settings."
+        />
+        <Card>
+          <CardBody className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-900">2FA required</p>
+              <p className="text-xs text-neutral-600">
+                For your security, this admin panel requires two-factor authentication. Open
+                Settings to enable it — we'll email a 6-character code (2 letters + 4 digits)
+                whenever you verify.
+              </p>
+              <a
+                href="/settings"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
+              >
+                Go to Settings →
+              </a>
+            </div>
+          </CardBody>
+        </Card>
+      </PageContainer>
+    );
+  }
+
+  if (!config) {
+    return (
+      <>
+        <PageContainer>
+          <PageHeader
+            title="Platform API keys"
+            description={
+              hasRecentMfa() ? 'Loading…' : 'Enter the 6-character code we just emailed you.'
+            }
+          />
+          {!hasRecentMfa() && (
+            <Card>
+              <CardBody className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-neutral-900">Verification needed</p>
+                  <p className="text-xs text-neutral-600">
+                    Your admin session needs a fresh 2FA code. Click below to send one to your email.
+                  </p>
+                  <Button onClick={() => setMfaModalOpen(true)} size="sm">
+                    Verify with 2FA
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
+        </PageContainer>
+        <MfaCodeModal
+          open={mfaModalOpen}
+          purpose="challenge"
+          onSuccess={() => {
+            setMfaModalOpen(false);
+            // Reload the config now that we have a fresh MFA session.
+            void load();
+          }}
+          onClose={() => setMfaModalOpen(false)}
+        />
+      </>
     );
   }
 
@@ -576,6 +701,15 @@ export default function PlatformSetupPage() {
           </Button>
         </div>
       </div>
+      <MfaCodeModal
+        open={mfaModalOpen}
+        purpose="challenge"
+        onSuccess={() => {
+          setMfaModalOpen(false);
+          void load();
+        }}
+        onClose={() => setMfaModalOpen(false)}
+      />
     </PageContainer>
   );
 }

@@ -24,6 +24,8 @@ export type {
   Message,
   AiHandoffFlag,
   PlatformConfig,
+  MfaCode,
+  MfaCodePurpose,
   SubscriptionTier,
   SubscriptionStatus,
   CourierName,
