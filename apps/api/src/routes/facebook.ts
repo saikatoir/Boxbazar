@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { listManagedPages, MessengerClient, MetaAuthError } from '@fcommerce/meta-sdk';
+import {
+  listManagedPages,
+  MessengerClient,
+  MetaAuthError,
+  exchangeForLongLivedUserToken,
+} from '@fcommerce/meta-sdk';
 import { Prisma } from '@fcommerce/db';
 import { prisma } from '../lib/prisma.js';
 import { encryptPageToken } from '../lib/meta.js';
@@ -89,10 +94,50 @@ export async function facebookRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.status(409).send({ message: 'This Facebook page is already connected to another store.' });
       }
 
-      const { metaGraphVersion } = await getPlatformConfig();
+      const platform = await getPlatformConfig();
+      const { metaGraphVersion } = platform;
+
+      // Exchange the short-lived Graph-Explorer token for a long-lived (60-day)
+      // user token *before* fetching pages — page tokens derived from a
+      // long-lived user token effectively never expire, which is what we want
+      // so the seller doesn't have to reconnect every 1-2 hours.
+      let effectiveUserToken = userAccessToken;
+      let tokenLifetime: 'long_lived' | 'short_lived' = 'short_lived';
+      let tokenWarning: string | null = null;
+      if (platform.metaAppId && platform.metaAppSecret) {
+        try {
+          const exchanged = await exchangeForLongLivedUserToken(
+            userAccessToken,
+            platform.metaAppId,
+            platform.metaAppSecret,
+            { graphVersion: metaGraphVersion },
+          );
+          effectiveUserToken = exchanged.access_token;
+          tokenLifetime = 'long_lived';
+        } catch (err) {
+          // Soft-fail: still let the connect proceed with the short token so
+          // the seller isn't completely blocked, but flag it loudly.
+          if (err instanceof MetaAuthError) {
+            fastify.log.warn(
+              { err },
+              'long-lived token exchange rejected — proceeding with short token',
+            );
+            tokenWarning =
+              'Long-lived token exchange failed. Page token will likely expire in ~1 hour. Verify Meta App ID + App Secret in /platform-setup.';
+          } else {
+            fastify.log.error({ err }, 'long-lived token exchange errored');
+            tokenWarning =
+              'Could not exchange for a long-lived token. Page token may expire soon.';
+          }
+        }
+      } else {
+        tokenWarning =
+          'Save your Meta App ID and App Secret in /platform-setup to get a non-expiring page token. Without them, this page will need re-connection every ~1 hour.';
+      }
+
       let page;
       try {
-        const pages = await listManagedPages(userAccessToken, { graphVersion: metaGraphVersion });
+        const pages = await listManagedPages(effectiveUserToken, { graphVersion: metaGraphVersion });
         page = pages.find((p) => p.id === pageId);
       } catch (err) {
         if (err instanceof MetaAuthError) return reply.status(401).send({ message: 'Invalid Facebook access token.' });
@@ -121,7 +166,11 @@ export async function facebookRoutes(fastify: FastifyInstance): Promise<void> {
           fbConnectedAt: new Date(),
         },
       });
-      return reply.send({ store: publicStore(updated) });
+      return reply.send({
+        store: publicStore(updated),
+        tokenLifetime,
+        tokenWarning,
+      });
     },
   );
 
